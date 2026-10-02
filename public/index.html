@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Spend</title>
+  <meta name="description" content="Personal spending tracker">
+  <meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0f0e" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/app-icons/apple-touch-icon.png">
+  <link rel="preload" href="/vendor/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/vendor/oat.min.css">
+  <link rel="stylesheet" href="/vendor/charts.min.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="/vendor/oat.min.js" defer></script>
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body data-sidebar-layout>
+
+<aside data-sidebar>
+  <header><span class="logo"><svg class="i"><use href="/icons.svg#wallet"/></svg></span> Spend</header>
+  <nav>
+    <ul>
+      <li><a href="#home" data-view="home"><svg class="i"><use href="/icons.svg#calendar-days"/></svg> Home</a></li>
+      <li><a href="#analytics" data-view="analytics"><svg class="i"><use href="/icons.svg#chart-column"/></svg> Analytics</a></li>
+      <li><a href="#categories" data-view="categories"><svg class="i"><use href="/icons.svg#tags"/></svg> Categories</a></li>
+    </ul>
+  </nav>
+  <footer><button class="large" style="width:100%" data-action="add"><svg class="i"><use href="/icons.svg#plus"/></svg> Add expense</button></footer>
+</aside>
+
+<main>
+  <div role="alert" data-variant="warning" id="session-banner" hidden>
+    <strong>Signed out.</strong> Your session expired.
+    <button class="small" data-action="reload">Sign in again</button>
+  </div>
+
+  <!-- ===== HOME ===== -->
+  <section id="v-home" hidden>
+    <div class="page-hdr">
+      <h2 data-month-label></h2>
+      <div class="month-nav">
+        <button class="ghost" data-action="month-prev" aria-label="Previous month"><svg class="i"><use href="/icons.svg#chevron-left"/></svg></button>
+        <button class="outline small" data-action="month-today">Today</button>
+        <button class="ghost" data-action="month-next" aria-label="Next month"><svg class="i"><use href="/icons.svg#chevron-right"/></svg></button>
+      </div>
+    </div>
+    <div class="home-grid">
+      <div class="kpis" id="home-kpis"></div>
+      <article class="card">
+        <div class="cal" id="cal"></div>
+        <div class="legend">Less <i style="--h:.08"></i><i style="--h:.3"></i><i style="--h:.6"></i><i style="--h:.9"></i> More</div>
+      </article>
+      <article class="card day-panel">
+        <header><h4 id="day-title"></h4><span class="badge" id="day-total"></span></header>
+        <div id="day-list"></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===== ANALYTICS ===== -->
+  <section id="v-analytics" hidden>
+    <div class="page-hdr">
+      <h2>Analytics</h2>
+      <div class="hstack" style="gap:var(--space-2);flex-wrap:wrap">
+        <menu class="buttons" id="period-toggle">
+          <li><button class="small" data-period="month">Month</button></li>
+          <li><button class="small outline" data-period="year">Year</button></li>
+        </menu>
+        <div class="month-nav">
+          <button class="ghost" data-action="period-prev" aria-label="Previous"><svg class="i"><use href="/icons.svg#chevron-left"/></svg></button>
+          <strong id="period-label"></strong>
+          <button class="ghost" data-action="period-next" aria-label="Next"><svg class="i"><use href="/icons.svg#chevron-right"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <div id="analytics"></div>
+  </section>
+
+  <!-- ===== CATEGORIES ===== -->
+  <section id="v-categories" hidden>
+    <div class="page-hdr">
+      <h2>Categories</h2>
+      <button class="outline small" data-action="new-category"><svg class="i"><use href="/icons.svg#plus"/></svg> New category</button>
+    </div>
+    <article class="card cat-card"><div id="cat-list"></div></article>
+  </section>
+</main>
+
+<!-- Phone only -->
+<button class="fab" data-action="add" aria-label="Add expense"><svg class="i"><use href="/icons.svg#plus"/></svg></button>
+<nav class="bottom-nav">
+  <a href="#home" data-view="home"><svg class="i"><use href="/icons.svg#calendar-days"/></svg>Home</a>
+  <a href="#analytics" data-view="analytics"><svg class="i"><use href="/icons.svg#chart-column"/></svg>Analytics</a>
+  <a href="#categories" data-view="categories"><svg class="i"><use href="/icons.svg#tags"/></svg>Categories</a>
+</nav>
+
+<!-- ===== Add / edit expense ===== -->
+<dialog id="expense-dlg" class="sheet" closedby="any">
+  <form method="dialog" id="expense-form" novalidate>
+    <header>
+      <h3 id="expense-title">Add expense</h3>
+      <p>Only “My share” counts as your spending</p>
+    </header>
+    <div class="body">
+      <div class="amount-in">
+        <span>₹</span>
+        <input name="paid" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Amount paid" required>
+      </div>
+
+      <div data-field>
+        <label>Category</label>
+        <div class="cat-pick" id="cat-pick"></div>
+        <div class="new-cat" id="new-cat" hidden>
+          <div class="hstack" style="gap:var(--space-2)">
+            <span class="cat-ico" id="new-cat-preview"></span>
+            <input id="new-cat-name" placeholder="New category name" maxlength="40" autocomplete="off" aria-label="New category name">
+          </div>
+          <details>
+            <summary>Choose icon &amp; colour</summary>
+            <div id="new-cat-picker"></div>
+          </details>
+        </div>
+      </div>
+
+      <div class="split-box">
+        <label class="hstack split-toggle">
+          <span class="hstack" style="gap:8px"><svg class="i"><use href="/icons.svg#split"/></svg> Split this bill</span>
+          <input name="split" type="checkbox" role="switch">
+        </label>
+        <div class="split-body" hidden>
+          <div class="counter">
+            <span>People, including me</span>
+            <menu class="buttons">
+              <li><button type="button" class="outline" data-people="-1" aria-label="Fewer people"><svg class="i"><use href="/icons.svg#minus"/></svg></button></li>
+              <li><button type="button" class="outline" disabled><output id="people">2</output></button></li>
+              <li><button type="button" class="outline" data-people="1" aria-label="More people"><svg class="i"><use href="/icons.svg#plus"/></svg></button></li>
+            </menu>
+          </div>
+          <div class="split-res">
+            <label><small>MY SHARE</small><input name="my_share" inputmode="decimal" autocomplete="off" aria-label="My share"></label>
+            <div><small>FOR OTHERS</small><b id="others-amt">₹0</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two">
+        <label data-field>Date<input name="spent_on" type="date" required></label>
+        <label data-field>Note<input name="note" maxlength="200" placeholder="Optional" autocomplete="off"></label>
+      </div>
+      <div role="alert" data-variant="error" id="expense-error" hidden></div>
+    </div>
+    <footer>
+      <button type="button" class="ghost danger-text" id="expense-delete" hidden><svg class="i"><use href="/icons.svg#trash-2"/></svg> Delete</button>
+      <button type="button" class="outline" data-close>Cancel</button>
+      <button type="submit" id="expense-save"><svg class="i"><use href="/icons.svg#check"/></svg> Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===== Category edit ===== -->
+<dialog id="category-dlg" class="sheet" closedby="any">
+  <form method="dialog" id="category-form" novalidate>
+    <header><h3 id="category-title">Category</h3></header>
+    <div class="body">
+      <div class="hstack" style="gap:var(--space-3)">
+        <span class="cat-ico large" id="category-preview"></span>
+        <label data-field style="flex:1">Name<input name="name" maxlength="40" required autocomplete="off"></label>
+      </div>
+      <div id="category-picker"></div>
+      <div role="alert" data-variant="error" id="category-error" hidden></div>
+    </div>
+    <footer>
+      <button type="button" class="outline" data-close>Cancel</button>
+      <button type="submit"><svg class="i"><use href="/icons.svg#check"/></svg> Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===== Category drill-down ===== -->
+<dialog id="drill-dlg" class="sheet" closedby="any">
+  <form method="dialog">
+    <header><h3 id="drill-title"></h3><p id="drill-sub"></p></header>
+    <div class="body" id="drill-body"></div>
+    <footer><button>Close</button></footer>
+  </form>
+</dialog>
+
+<!-- ===== Confirm ===== -->
+<dialog id="confirm-dlg" closedby="any">
+  <form method="dialog">
+    <header><h3 id="confirm-title"></h3><p id="confirm-text"></p></header>
+    <footer>
+      <button value="cancel" class="outline">Cancel</button>
+      <button value="ok" data-variant="danger" id="confirm-ok">Delete</button>
+    </footer>
+  </form>
+</dialog>
+
+</body>
+</html>
