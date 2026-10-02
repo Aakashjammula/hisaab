@@ -80,6 +80,7 @@ async function showView(view) {
 
 async function goMonth(key) {
   state.month = key;
+  if (state.period.type === 'month') state.period = { type: 'month', key };
   const today = todayISO();
   state.selectedDate = monthOf(today) === key ? today : isoDate(key, 1);
   state.analyticsSummary = null;
@@ -88,6 +89,7 @@ async function goMonth(key) {
 
 async function goPeriod(period) {
   state.period = period;
+  if (period.type === 'month' && period.key !== state.month) { goMonth(period.key); return; }
   state.analyticsSummary = null;
   render();
   try { await loadAnalytics(); } catch (err) { toast(err.message, 'danger'); }
@@ -96,7 +98,10 @@ async function goPeriod(period) {
 
 // After any add/edit/delete: reload, and jump to the expense's month/day if it's elsewhere.
 async function onExpensesChanged(date) {
-  if (date && monthOf(date) !== state.month) state.month = monthOf(date);
+  if (date && monthOf(date) !== state.month) {
+    state.month = monthOf(date);
+    if (state.period.type === 'month') state.period = { type: 'month', key: state.month };
+  }
   if (date) state.selectedDate = date;
   state.analyticsSummary = null;
   await refresh();

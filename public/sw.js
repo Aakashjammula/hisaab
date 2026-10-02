@@ -1,6 +1,6 @@
 // Offline-capable shell. API calls are never cached (always fresh, always authenticated).
 // Bump VERSION when the list of shell files changes.
-const VERSION = 'spend-v2';
+const VERSION = 'spend-v3';
 const SHELL = [
   '/', '/css/app.css', '/icons.svg', '/manifest.webmanifest', '/favicon.svg',
   '/vendor/oat.min.css', '/vendor/oat.min.js', '/vendor/charts.min.css', '/vendor/fonts/manrope-latin.woff2',
@@ -28,13 +28,12 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Static files: serve from cache, refresh in the background (stale-while-revalidate).
-  e.respondWith(caches.open(VERSION).then(async cache => {
-    const cached = await cache.match(e.request);
-    const fresh = fetch(e.request).then(res => {
-      if (res.ok && res.type === 'basic') cache.put(e.request, res.clone());
-      return res;
-    }).catch(() => cached);
-    return cached || fresh;
-  }));
+  // Static files: network first so a deploy never mixes old and new modules; cache is the offline fallback.
+  e.respondWith(fetch(e.request).then(res => {
+    if (res.ok && res.type === 'basic') {
+      const copy = res.clone();
+      caches.open(VERSION).then(c => c.put(e.request, copy));
+    }
+    return res;
+  }).catch(() => caches.match(e.request)));
 });

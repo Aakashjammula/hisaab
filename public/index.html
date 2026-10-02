@@ -147,7 +147,7 @@
       </div>
 
       <div class="two">
-        <label data-field>Date<input name="spent_on" type="date" required></label>
+        <label data-field>Date<input name="spent_on" type="date" min="2000-01-01" max="2100-12-31" required></label>
         <label data-field>Note<input name="note" maxlength="200" placeholder="Optional" autocomplete="off"></label>
       </div>
       <div role="alert" data-variant="error" id="expense-error" hidden></div>

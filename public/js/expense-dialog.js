@@ -162,7 +162,8 @@ async function onSubmit(e) {
   if (share == null) return showError('Enter your share, e.g. 200');
   if (share > paid) return showError('Your share cannot be more than the amount paid');
   if (!selected || !selected.name?.trim()) return showError('Pick a category or create a new one');
-  if (!f.elements.spent_on.value) return showError('Pick a date');
+  const date = f.elements.spent_on.value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < '2000-01-01' || date > '2100-12-31') return showError('Pick a valid date');
 
   const body = {
     paid: toRupeeString(paid),
@@ -171,7 +172,17 @@ async function onSubmit(e) {
     note: f.elements.note.value.trim() || null,
     spent_on: f.elements.spent_on.value,
   };
-  if (selected.isNew) { body.category_icon = selected.icon; body.category_color = selected.color; }
+  if (selected.isNew) {
+    const existing = ctx.getCategories().find(c => c.name.toLowerCase() === body.category.replace(/\s+/g, ' ').toLowerCase());
+    if (existing) {
+      // Don't silently drop the chosen icon: switch to the existing category and let the user confirm.
+      selected = { ...existing, isNew: false };
+      $('#new-cat').hidden = true;
+      renderChips();
+      return showError(`“${existing.name}” already exists, so it's selected now. Press Save again to use it.`);
+    }
+    body.category_icon = selected.icon; body.category_color = selected.color;
+  }
 
   const btn = $('#expense-save');
   btn.disabled = true;
