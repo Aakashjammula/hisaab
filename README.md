@@ -1,6 +1,6 @@
-# Spend
+# Hisaab
 
-Personal spending tracker. Log every payment, record only **your share** of split bills, and see where the money goes.
+Hisaab (हिसाब, "keeping count") is a personal spending tracker. Log every payment, record only **your share** of split bills, and see where the money goes.
 
 - **Cloudflare Workers** serves the static UI and a small JSON API (free plan)
 - **D1** (SQLite) stores the data. Tables are `STRICT` and money is integer paise
@@ -21,8 +21,8 @@ If `.dev.vars` is missing, create it with `DEV_BYPASS_AUTH=true`. It is git-igno
 ## One-time Cloudflare setup
 
 1. **Log in**: `npx wrangler login`
-2. **Create the database**: `npx wrangler d1 create spend-tracker`, then copy the `database_id` into `wrangler.jsonc`.
-3. **Pick a subdomain** on your Cloudflare domain and set it in `wrangler.jsonc` → `routes[0].pattern` (e.g. `spend.example.com`).
+2. **Create the database**: `npx wrangler d1 create hisaab`, then copy the `database_id` into `wrangler.jsonc`.
+3. **Pick a subdomain** on your Cloudflare domain and set it in `wrangler.jsonc` → `routes[0].pattern` (e.g. `hisaab.example.com`).
 4. **Create the tables**: `npm run db:migrate:remote`
 5. **Protect it with Access** (Cloudflare dashboard → Zero Trust):
    - Settings → Authentication → make sure **One-time PIN** is enabled.
@@ -30,8 +30,10 @@ If `.dev.vars` is missing, create it with `DEV_BYPASS_AUTH=true`. It is git-igno
      Session duration = **1 month**. Policy: **Allow**, include **Emails** = your email.
    - Copy the **Application Audience (AUD) Tag** into `POLICY_AUD` in `wrangler.jsonc`.
    - Set `TEAM_DOMAIN` to `https://<your-team>.cloudflareaccess.com` (shown under Settings → Custom pages / team domain).
-6. **Deploy**: `npm run deploy`
-7. Open your subdomain, enter the PIN from your email, then use **Add to Home Screen** to install it.
+6. **Set who may use the API** (kept as a secret, not in git): `npx wrangler secret put ALLOWED_EMAIL` and enter your email.
+   For more than one person, separate emails with commas.
+7. **Deploy**: `npm run deploy`
+8. Open your subdomain, enter the PIN from your email, then use **Add to Home Screen** to install it.
 
 `workers_dev` and `preview_urls` are off on purpose: those URLs are **not** covered by Access.
 If Access isn't configured, the API refuses every request (it fails closed).

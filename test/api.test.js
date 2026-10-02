@@ -23,11 +23,11 @@ describe('auth', () => {
     expect(res.status).toBe(401);
   });
   it('does not honour the dev bypass on a real hostname', async () => {
-    const res = await worker.fetch(new Request('https://spend.example.com/api/expenses'), { ...env, DEV_BYPASS_AUTH: 'true' });
+    const res = await worker.fetch(new Request('https://hisaab.example.com/api/expenses'), { ...env, DEV_BYPASS_AUTH: 'true' });
     expect(res.status).toBe(401);
   });
   it('fails closed when Access is not configured', async () => {
-    const res = await worker.fetch(new Request('https://spend.example.com/api/expenses'), { ...env, TEAM_DOMAIN: '' });
+    const res = await worker.fetch(new Request('https://hisaab.example.com/api/expenses'), { ...env, TEAM_DOMAIN: '' });
     expect(res.status).toBe(500);
   });
   it('blocks cross-origin writes and non-JSON bodies', async () => {

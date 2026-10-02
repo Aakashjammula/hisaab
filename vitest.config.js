@@ -13,6 +13,7 @@ export default defineConfig(async () => {
             DEV_BYPASS_AUTH: 'true',
             TEAM_DOMAIN: 'https://test.cloudflareaccess.com',
             POLICY_AUD: 'test-aud',
+            ALLOWED_EMAIL: 'me@example.com',
           },
         },
       }),

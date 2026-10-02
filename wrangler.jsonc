@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "spend-tracker",
+  "name": "hisaab",
   "main": "src/worker.js",
   "compatibility_date": "2026-08-22",
 
@@ -9,8 +9,8 @@
   "workers_dev": false,
   "preview_urls": false,
 
-  // Set your subdomain (the zone must be on your Cloudflare account), e.g. "spend.example.com".
-  "routes": [{ "pattern": "spend.REPLACE-WITH-YOUR-DOMAIN.com", "custom_domain": true }],
+  // Set your subdomain (the zone must be on your Cloudflare account), e.g. "hisaab.example.com".
+  "routes": [{ "pattern": "hisaab.REPLACE-WITH-YOUR-DOMAIN.com", "custom_domain": true }],
 
   "assets": {
     "directory": "./public",
@@ -22,7 +22,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "spend-tracker",
+      "database_name": "hisaab",
       "database_id": "REPLACE-WITH-ID-FROM-wrangler-d1-create",
       "migrations_dir": "migrations"
     }
@@ -33,8 +33,8 @@
     // From Zero Trust > Settings > Custom pages / team domain, e.g. "https://yourteam.cloudflareaccess.com"
     "TEAM_DOMAIN": "https://REPLACE.cloudflareaccess.com",
     // From Zero Trust > Access > Applications > (your app) > Overview > Application Audience (AUD) Tag
-    "POLICY_AUD": "REPLACE",
-    "ALLOWED_EMAIL": "you@example.com"
+    "POLICY_AUD": "REPLACE"
+    // ALLOWED_EMAIL is a secret (kept out of git): npx wrangler secret put ALLOWED_EMAIL
   },
 
   "observability": { "enabled": true }

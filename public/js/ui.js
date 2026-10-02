@@ -28,6 +28,43 @@ export function confirmDialog(title, text, okLabel = 'Delete') {
   return new Promise(resolve => dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true }));
 }
 
+/**
+ * Phone Back button closes the open dialog (or ⋮ menu) instead of leaving the app.
+ * Opening adds a history entry; Back pops it and closes the top-most layer.
+ * Closing any other way (Cancel, Esc, Save) removes that entry again.
+ */
+export function enableBackToClose() {
+  let ignorePops = 0;
+  const layerOpened = el => {
+    history.pushState({ layer: true }, '');
+    const onClosed = () => {
+      if (el.__closedByBack) { el.__closedByBack = false; return; }
+      if (history.state?.layer) { ignorePops++; history.back(); }
+    };
+    if (el instanceof HTMLDialogElement) el.addEventListener('close', onClosed, { once: true });
+    else el.addEventListener('toggle', function t(e) { if (e.newState === 'closed') { el.removeEventListener('toggle', t); onClosed(); } });
+  };
+
+  const showModal = HTMLDialogElement.prototype.showModal;
+  HTMLDialogElement.prototype.showModal = function () {
+    showModal.call(this);
+    layerOpened(this);
+  };
+  document.addEventListener('toggle', e => {
+    if (e.target.matches?.('[popover]') && e.newState === 'open') layerOpened(e.target);
+  }, true);
+
+  addEventListener('popstate', () => {
+    if (ignorePops > 0) { ignorePops--; return; }
+    const popover = document.querySelector('[popover]:popover-open');
+    const dialog = [...document.querySelectorAll('dialog[open]')].pop();
+    const top = popover ?? dialog;
+    if (!top) return;
+    top.__closedByBack = true;
+    if (top === popover) top.hidePopover(); else top.close();
+  });
+}
+
 // ---- dates (local time; the owner is in one time zone) ----
 const pad = n => String(n).padStart(2, '0');
 export const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };

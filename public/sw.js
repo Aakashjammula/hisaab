@@ -1,6 +1,6 @@
 // Offline-capable shell. API calls are never cached (always fresh, always authenticated).
 // Bump VERSION when the list of shell files changes.
-const VERSION = 'spend-v3';
+const VERSION = 'hisaab-v4';
 const SHELL = [
   '/', '/css/app.css', '/icons.svg', '/manifest.webmanifest', '/favicon.svg',
   '/vendor/oat.min.css', '/vendor/oat.min.js', '/vendor/charts.min.css', '/vendor/fonts/manrope-latin.woff2',

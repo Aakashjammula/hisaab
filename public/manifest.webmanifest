@@ -1,6 +1,6 @@
 {
-  "name": "Spend",
-  "short_name": "Spend",
+  "name": "Hisaab",
+  "short_name": "Hisaab",
   "description": "Personal spending tracker",
   "start_url": "/#home",
   "scope": "/",

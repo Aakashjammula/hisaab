@@ -1,5 +1,5 @@
 {
-  "name": "spend-tracker",
+  "name": "hisaab",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,8 +7,8 @@
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "vendor": "node scripts/vendor.mjs",
-    "db:migrate:local": "wrangler d1 migrations apply spend-tracker --local",
-    "db:migrate:remote": "wrangler d1 migrations apply spend-tracker --remote"
+    "db:migrate:local": "wrangler d1 migrations apply hisaab --local",
+    "db:migrate:remote": "wrangler d1 migrations apply hisaab --remote"
   },
   "dependencies": {
     "jose": "^6.2.12"

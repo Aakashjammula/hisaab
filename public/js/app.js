@@ -4,7 +4,7 @@ import { positionAvgLines, renderAnalytics, renderDrill } from './analytics.js';
 import { deleteCategory, initCategories, openCategoryDialog, renderCategories } from './categories.js';
 import { deleteExpense, initExpenseDialog, openExpenseDialog } from './expense-dialog.js';
 import { expenseRow, renderHome } from './home.js';
-import { $, $$, addMonths, confirmDialog, isoDate, monthLabel, monthOf, toast, todayISO } from './ui.js';
+import { $, $$, addMonths, confirmDialog, enableBackToClose, isoDate, monthLabel, monthOf, toast, todayISO } from './ui.js';
 import { formatINR } from './money.js';
 
 const VIEWS = ['home', 'analytics', 'categories'];
@@ -171,6 +171,7 @@ addEventListener('resize', () => {
 });
 
 // ---------- boot ----------
+enableBackToClose();
 setSessionExpiredHandler(() => { $('#session-banner').hidden = false; });
 initExpenseDialog({ getCategories: () => state.categories, onChanged: onExpensesChanged });
 initCategories({ getCategories: () => state.categories, onChanged: () => { state.analyticsSummary = null; refresh(); } });
