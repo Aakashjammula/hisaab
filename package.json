@@ -1,0 +1,30 @@
+{
+  "name": "spend-tracker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "vendor": "node scripts/vendor.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply spend-tracker --local",
+    "db:migrate:remote": "wrangler d1 migrations apply spend-tracker --remote"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@knadh/oat": "^0.8.0",
+    "charts.css": "^1.2.0",
+    "lucide-static": "^1.50.0",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.147.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260815.1": true,
+    "workerd@1.20261001.1": true
+  }
+}
