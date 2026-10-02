@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hisaab",
-  "main": "src/worker.js",
+  "main": "src/adapters/cloudflare/worker.ts",
   "compatibility_date": "2026-08-22",
 
   // The free *.workers.dev URL and preview URLs are NOT behind Cloudflare Access.
@@ -28,13 +28,19 @@
     }
   ],
 
+  // Email the login codes are sent from (domain must have Cloudflare Email Routing enabled).
+  // Free when the recipient is a verified destination address in this account.
+  "send_email": [{ "name": "EMAIL" }],
+
   "vars": {
+    "APP_NAME": "Hisaab",
     "TIME_ZONE": "Asia/Kolkata",
-    // From Zero Trust > Settings > Custom pages / team domain, e.g. "https://yourteam.cloudflareaccess.com"
-    "TEAM_DOMAIN": "https://aakashjammula.cloudflareaccess.com",
-    // From Zero Trust > Access > Applications > (your app) > Overview > Application Audience (AUD) Tag
-    "POLICY_AUD": "115b16983adee4891c3730d73eff2116cf55a67cb308053e0d570715f0cb67c3"
-    // ALLOWED_EMAIL is a secret (kept out of git): npx wrangler secret put ALLOWED_EMAIL
+    "MAIL_FROM": "noreply@aakashjammula.com",
+    // closed = only ALLOWED_EMAILS can sign in; invite = ALLOWED_EMAILS get accounts on first login; open = anyone
+    "AUTH_MODE": "closed"
+    // Secrets (not in git):
+    //   npx wrangler secret put AUTH_SECRET      (random, e.g. `openssl rand -base64 32`)
+    //   npx wrangler secret put ALLOWED_EMAILS   (comma-separated)
   },
 
   "observability": { "enabled": true }

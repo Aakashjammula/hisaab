@@ -38,10 +38,36 @@
 </aside>
 
 <main>
-  <div role="alert" data-variant="warning" id="session-banner" hidden>
-    <strong>Signed out.</strong> Your session expired.
-    <button class="small" data-action="reload">Sign in again</button>
-  </div>
+  <!-- ===== SIGN IN ===== -->
+  <section id="v-login" hidden>
+    <article class="card login-card">
+      <header class="login-brand"><span class="logo"><svg class="i"><use href="/icons.svg#wallet"/></svg></span> Hisaab</header>
+
+      <form id="login-email-form" novalidate>
+        <h3>Sign in</h3>
+        <p class="muted">We'll email you a 6-digit code. No password needed.</p>
+        <label data-field>Email
+          <input name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+        </label>
+        <button type="submit" class="large" style="width:100%">Email me a code</button>
+      </form>
+
+      <form id="login-code-form" novalidate hidden>
+        <h3>Check your email</h3>
+        <p class="muted">Enter the code sent to <b id="login-sent-to"></b>. It expires in 10 minutes.</p>
+        <label data-field>Code
+          <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required class="code-input">
+        </label>
+        <button type="submit" class="large" style="width:100%">Sign in</button>
+        <div class="login-links">
+          <button type="button" class="ghost small" data-action="login-change-email">Use a different email</button>
+          <button type="button" class="ghost small" data-action="login-resend">Resend code</button>
+        </div>
+      </form>
+
+      <div role="alert" data-variant="error" id="login-error" hidden></div>
+    </article>
+  </section>
 
   <!-- ===== HOME ===== -->
   <section id="v-home" hidden>
@@ -96,7 +122,10 @@
       <header><h4>Account</h4></header>
       <div class="account">
         <small class="muted">Signed in as <b data-me-email></b></small>
-        <button class="outline small" data-action="logout"><svg class="i"><use href="/icons.svg#log-out"/></svg> Log out</button>
+        <div class="hstack" style="gap:var(--space-2)">
+          <button class="ghost small" data-action="logout-everywhere">Log out everywhere</button>
+          <button class="outline small" data-action="logout"><svg class="i"><use href="/icons.svg#log-out"/></svg> Log out</button>
+        </div>
       </div>
     </article>
   </section>

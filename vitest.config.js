@@ -10,10 +10,9 @@ export default defineConfig(async () => {
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,
-            DEV_BYPASS_AUTH: 'true',
-            TEAM_DOMAIN: 'https://test.cloudflareaccess.com',
-            POLICY_AUD: 'test-aud',
-            ALLOWED_EMAIL: 'me@example.com',
+            AUTH_SECRET: 'test-secret-at-least-16-chars',
+            ALLOWED_EMAILS: 'me@example.com',
+            MAILER: 'memory',
           },
         },
       }),

@@ -1,11 +1,11 @@
 // Offline-capable shell. API calls are never cached (always fresh, always authenticated).
 // Bump VERSION when the list of shell files changes.
-const VERSION = 'hisaab-v5';
+const VERSION = 'hisaab-v6';
 const SHELL = [
   '/', '/css/app.css', '/icons.svg', '/manifest.webmanifest', '/favicon.svg',
   '/vendor/oat.min.css', '/vendor/oat.min.js', '/vendor/charts.min.css', '/vendor/fonts/manrope-latin.woff2',
   '/js/app.js', '/js/api.js', '/js/ui.js', '/js/money.js', '/js/icon-list.js', '/js/icon-picker.js',
-  '/js/home.js', '/js/analytics.js', '/js/categories.js', '/js/expense-dialog.js',
+  '/js/home.js', '/js/analytics.js', '/js/categories.js', '/js/expense-dialog.js', '/js/login.js',
 ];
 
 self.addEventListener('install', e => {

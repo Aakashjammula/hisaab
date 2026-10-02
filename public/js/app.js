@@ -6,6 +6,7 @@ import { deleteExpense, initExpenseDialog, openExpenseDialog } from './expense-d
 import { expenseRow, renderHome } from './home.js';
 import { $, $$, addMonths, confirmDialog, enableBackToClose, isoDate, monthLabel, monthOf, toast, todayISO } from './ui.js';
 import { formatINR } from './money.js';
+import { hideLogin, initLogin, showLogin } from './login.js';
 
 const VIEWS = ['home', 'analytics', 'categories'];
 
@@ -50,6 +51,7 @@ async function refresh({ categories = true } = {}) {
 
 // ---------- render ----------
 function render() {
+  if (document.body.classList.contains('signed-out')) return; // login screen owns the page
   for (const v of VIEWS) $(`#v-${v}`).hidden = v !== state.view;
   $$('[data-view]').forEach(a => a.toggleAttribute('aria-current', a.dataset.view === state.view));
   $$('[data-month-label]').forEach(el => { el.textContent = monthLabel(state.month); });
@@ -116,7 +118,7 @@ document.addEventListener('click', async e => {
     if (type !== state.period.type) goPeriod({ type, key: type === 'month' ? state.month : state.month.slice(0, 4) });
     return;
   }
-  const id = Number(el.dataset.id);
+  const id = el.dataset.id; // UUID string
   switch (el.dataset.action) {
     case 'add': openExpenseDialog({ date: el.dataset.date ?? (monthOf(state.selectedDate) === state.month ? state.selectedDate : todayISO()) }); break;
     case 'pick-day': state.selectedDate = el.dataset.date; renderHome(state); break;
@@ -145,10 +147,16 @@ document.addEventListener('click', async e => {
     case 'new-category': openCategoryDialog(); break;
     case 'edit-category': openCategoryDialog(state.categories.find(c => c.id === id)); break;
     case 'delete-category': deleteCategory(state.categories.find(c => c.id === id)); break;
-    case 'reload': location.reload(); break;
     case 'logout':
       if (await confirmDialog('Log out?', 'You will need to sign in again on this device.', 'Log out')) {
-        location.href = '/cdn-cgi/access/logout'; // ends the Cloudflare Access session
+        await api.logout().catch(() => {});
+        signedOut();
+      }
+      break;
+    case 'logout-everywhere':
+      if (await confirmDialog('Log out everywhere?', 'This signs you out on every phone and computer, including this one.', 'Log out everywhere')) {
+        await api.logoutEverywhere().catch(() => {});
+        signedOut();
       }
       break;
   }
@@ -176,15 +184,31 @@ addEventListener('resize', () => {
 });
 
 // ---------- boot ----------
+function signedOut() {
+  Object.assign(state, { expenses: [], categories: [], homeSummary: null, analyticsSummary: null });
+  showLogin();
+}
+
+async function startApp(me) {
+  hideLogin();
+  $$('[data-me-email]').forEach(el => { el.textContent = me.email; });
+  state.view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
+  render();
+  await refresh();
+  if (state.view === 'analytics') await showView('analytics');
+}
+
 enableBackToClose();
-setSessionExpiredHandler(() => { $('#session-banner').hidden = false; });
+setSessionExpiredHandler(signedOut);
+initLogin({ onSignedIn: startApp });
 initExpenseDialog({ getCategories: () => state.categories, onChanged: onExpensesChanged });
 initCategories({ getCategories: () => state.categories, onChanged: () => { state.analyticsSummary = null; refresh(); } });
 
-state.view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
-await refresh();
-if (state.view === 'analytics') await showView('analytics');
-api.me().then(me => $$('[data-me-email]').forEach(el => { el.textContent = me.email; })).catch(() => {});
+try {
+  await startApp(await api.me());
+} catch (err) {
+  if (err.status !== 401) { showLogin(); toast(err.message, 'danger'); }
+}
 
 if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
