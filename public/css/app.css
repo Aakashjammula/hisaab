@@ -53,7 +53,8 @@ button { gap: 6px; }
 @media (max-width: 768px) {
   [data-sidebar-layout] { grid-template-rows: 1fr; }
   [data-sidebar] { display: none; }
-  main { padding: var(--space-3) var(--space-3) calc(96px + env(safe-area-inset-bottom)); }
+  /* room for the bottom nav (≈70px) + the floating add button above it (56px) */
+  main { padding: var(--space-3) var(--space-3) calc(160px + env(safe-area-inset-bottom)); }
   .bottom-nav {
     display: flex; position: fixed; inset: auto 0 0 0; z-index: 5; background: var(--card);
     border-top: 1px solid var(--border); padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
@@ -252,6 +253,12 @@ dialog form > footer > #expense-delete { flex: 0 0 auto; margin-right: auto; }
 .cat-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
 .cat-item:first-child { border-top: 0; }
 .cat-item b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== Account / log out ===== */
+.account { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+.account small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-card { margin-top: var(--space-4); }
+.account-card .account { margin-top: 0; }
 
 /* ===== Loading ===== */
 .skeleton.box { height: 120px; border-radius: var(--radius-medium); }

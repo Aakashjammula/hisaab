@@ -146,6 +146,11 @@ document.addEventListener('click', async e => {
     case 'edit-category': openCategoryDialog(state.categories.find(c => c.id === id)); break;
     case 'delete-category': deleteCategory(state.categories.find(c => c.id === id)); break;
     case 'reload': location.reload(); break;
+    case 'logout':
+      if (await confirmDialog('Log out?', 'You will need to sign in again on this device.', 'Log out')) {
+        location.href = '/cdn-cgi/access/logout'; // ends the Cloudflare Access session
+      }
+      break;
   }
 });
 
@@ -179,6 +184,7 @@ initCategories({ getCategories: () => state.categories, onChanged: () => { state
 state.view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
 await refresh();
 if (state.view === 'analytics') await showView('analytics');
+api.me().then(me => $$('[data-me-email]').forEach(el => { el.textContent = me.email; })).catch(() => {});
 
 if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('/sw.js').catch(() => {});

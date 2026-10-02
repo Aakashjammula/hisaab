@@ -31,6 +31,7 @@ async function request(method, path, body) {
 }
 
 export const api = {
+  me: () => request('GET', '/api/me'),
   expenses: month => request('GET', `/api/expenses?month=${month}`),
   createExpense: body => request('POST', '/api/expenses', body),
   updateExpense: (id, body) => request('PUT', `/api/expenses/${id}`, body),

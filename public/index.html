@@ -28,7 +28,13 @@
       <li><a href="#categories" data-view="categories"><svg class="i"><use href="/icons.svg#tags"/></svg> Categories</a></li>
     </ul>
   </nav>
-  <footer><button class="large" style="width:100%" data-action="add"><svg class="i"><use href="/icons.svg#plus"/></svg> Add expense</button></footer>
+  <footer>
+    <button class="large" style="width:100%" data-action="add"><svg class="i"><use href="/icons.svg#plus"/></svg> Add expense</button>
+    <div class="account">
+      <small class="muted" data-me-email></small>
+      <button class="ghost small" data-action="logout"><svg class="i"><use href="/icons.svg#log-out"/></svg> Log out</button>
+    </div>
+  </footer>
 </aside>
 
 <main>
@@ -86,6 +92,13 @@
       <button class="outline small" data-action="new-category"><svg class="i"><use href="/icons.svg#plus"/></svg> New category</button>
     </div>
     <article class="card cat-card"><div id="cat-list"></div></article>
+    <article class="card cat-card account-card">
+      <header><h4>Account</h4></header>
+      <div class="account">
+        <small class="muted">Signed in as <b data-me-email></b></small>
+        <button class="outline small" data-action="logout"><svg class="i"><use href="/icons.svg#log-out"/></svg> Log out</button>
+      </div>
+    </article>
   </section>
 </main>
 
