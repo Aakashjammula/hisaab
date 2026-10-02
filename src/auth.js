@@ -15,6 +15,7 @@ export async function requireUser(request, env) {
 
   const { TEAM_DOMAIN, POLICY_AUD, ALLOWED_EMAIL } = env;
   if (!TEAM_DOMAIN || !POLICY_AUD || !ALLOWED_EMAIL || TEAM_DOMAIN.includes('REPLACE')) {
+    logSetupHint(request);
     throw new HttpError(500, 'Auth is not configured'); // fail closed
   }
 
@@ -38,6 +39,20 @@ export async function requireUser(request, env) {
     throw new HttpError(403, 'Forbidden');
   }
   return { email: payload.email };
+}
+
+/**
+ * Setup helper: before TEAM_DOMAIN/POLICY_AUD are configured, log the (non-secret) issuer and
+ * audience from the Access token so they can be copied into wrangler.jsonc. Never logs the token.
+ */
+function logSetupHint(request) {
+  const token = request.headers.get('cf-access-jwt-assertion');
+  if (!token) return;
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const { iss, aud } = JSON.parse(atob(b64));
+    console.log(JSON.stringify({ setup_hint: true, TEAM_DOMAIN: iss, POLICY_AUD: Array.isArray(aud) ? aud[0] : aud }));
+  } catch {}
 }
 
 /** Writes must come from our own page: JSON content type is enforced in readJson, plus same-origin here. */
