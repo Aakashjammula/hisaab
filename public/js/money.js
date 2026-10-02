@@ -16,6 +16,18 @@ export function toPaise(input) {
   return Number.isSafeInteger(paise) ? paise : null;
 }
 
+/**
+ * Keep only what a rupee amount can contain while the user types:
+ * digits, one ".", at most 2 decimals, at most 7 whole digits. "1a2.345" -> "12.34"
+ */
+export function cleanAmountInput(value) {
+  const v = String(value).replace(/[^\d.]/g, '');
+  const dot = v.indexOf('.');
+  const whole = (dot === -1 ? v : v.slice(0, dot)).slice(0, 7) || (dot === -1 ? '' : '0');
+  if (dot === -1) return whole;
+  return `${whole}.${v.slice(dot + 1).replace(/\./g, '').slice(0, 2)}`;
+}
+
 /** Paise -> "12.5" style string for putting back into an input box. */
 export function toRupeeString(paise) {
   const r = Math.trunc(paise / 100), p = paise % 100;

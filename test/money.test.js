@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatINR, formatShort, splitShare, toPaise, toRupeeString } from '../public/js/money.js';
+import { cleanAmountInput, formatINR, formatShort, splitShare, toPaise, toRupeeString } from '../public/js/money.js';
 import { suggestIcon } from '../public/js/icon-list.js';
 
 describe('toPaise', () => {
@@ -36,4 +36,11 @@ describe('formatting', () => {
 describe('suggestIcon', () => {
   it.each([['Gym', 'dumbbell'], ['Coffee', 'coffee'], ['Petrol', 'fuel'], ['Netflix', 'tv-minimal-play'], ['Zxqv', 'tag']])(
     '%s -> %s', (name, icon) => expect(suggestIcon(name)).toBe(icon));
+});
+
+describe('cleanAmountInput', () => {
+  it.each([
+    ['dwdwdwdw', ''], ['1a2b3', '123'], ['12.345', '12.34'], ['1.2.3', '1.23'], ['.5', '0.5'],
+    ['₹1,000', '1000'], ['-50', '50'], ['123456789', '1234567'], ['1e5', '15'], ['249.50', '249.50'],
+  ])('%s -> %s', (input, out) => expect(cleanAmountInput(input)).toBe(out));
 });

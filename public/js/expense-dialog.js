@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { suggestIcon } from './icon-list.js';
 import { createIconPicker } from './icon-picker.js';
-import { formatINR, splitShare, toPaise, toRupeeString } from './money.js';
+import { cleanAmountInput, formatINR, splitShare, toPaise, toRupeeString } from './money.js';
 import { $, catIcon, confirmDialog, esc, icon, toast, todayISO } from './ui.js';
 
 const SHOWN_CHIPS = 8;
@@ -24,6 +24,17 @@ export function initExpenseDialog(options) {
     onChange: v => { iconTouched = true; selected = { ...selected, ...v }; renderNewPreview(); },
   });
 
+  // Amount fields accept only digits and one decimal point (max 2 decimals), even from a laptop keyboard or paste.
+  for (const input of [f.elements.paid, f.elements.my_share]) {
+    input.addEventListener('input', () => {
+      const cleaned = cleanAmountInput(input.value);
+      if (cleaned !== input.value) {
+        const pos = Math.max(0, (input.selectionStart ?? cleaned.length) - (input.value.length - cleaned.length));
+        input.value = cleaned;
+        input.setSelectionRange?.(pos, pos);
+      }
+    });
+  }
   f.elements.paid.addEventListener('input', recalc);
   f.elements.split.addEventListener('change', () => { customShare = false; recalc(); });
   f.elements.my_share.addEventListener('input', () => { customShare = true; recalc(); });
