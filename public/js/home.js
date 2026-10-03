@@ -19,11 +19,11 @@ export function kpiCards(s) {
 }
 
 /** Expense row with an Edit/Delete menu. */
-export function expenseRow(e, { menu = true } = {}) {
+export function expenseRow(e, { menu = true, index = 0, flash = false } = {}) {
   const tag = e.my_share === 0 ? '<span class="badge outline">For others</span>'
     : e.my_share !== e.paid ? '<span class="badge outline">Split</span>' : '';
   return `
-    <div class="exp">
+    <div class="exp${flash ? ' flash' : ''}" style="--i:${index}">
       ${catIcon(e)}
       <div class="mid"><b>${esc(e.note || e.category)}</b><small>${e.note ? esc(e.category) : ''} ${tag}</small></div>
       <div class="amt"><b>${formatINR(e.my_share)}</b>${e.paid !== e.my_share ? `<small>paid ${formatINR(e.paid)}</small>` : ''}</div>
@@ -63,8 +63,13 @@ export function renderHome(state) {
   const list = expenses.filter(e => e.spent_on === selectedDate);
   $('#day-title').textContent = (selectedDate === today ? 'Today, ' : '') + dayLabel(selectedDate);
   $('#day-total').textContent = formatINR(totals[selectedDate] ?? 0);
-  $('#day-list').innerHTML = list.length
-    ? list.map(e => expenseRow(e)).join('')
+  const dayList = $('#day-list');
+  // Animate the list in only when it really changes (new day, or after a save), not on every redraw.
+  const key = `${selectedDate}|${list.map(e => e.id).join(',')}`;
+  dayList.classList.toggle('animate', dayList.dataset.key !== key);
+  dayList.dataset.key = key;
+  dayList.innerHTML = list.length
+    ? list.map((e, i) => expenseRow(e, { index: i, flash: e.id === state.flashId })).join('')
     : `<div class="empty">${icon('calendar-x')}No expenses this day
          <button class="outline small" data-action="add" data-date="${selectedDate}">${icon('plus')} Add one</button></div>`;
 }

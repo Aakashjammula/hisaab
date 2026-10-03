@@ -15,6 +15,18 @@
   <link rel="stylesheet" href="/vendor/charts.min.css">
   <link rel="stylesheet" href="/css/app.css">
   <script src="/vendor/oat.min.js" defer></script>
+  <!-- fetch all modules in parallel instead of discovering them import by import -->
+  <link rel="modulepreload" href="/js/app.js">
+  <link rel="modulepreload" href="/js/api.js">
+  <link rel="modulepreload" href="/js/ui.js">
+  <link rel="modulepreload" href="/js/money.js">
+  <link rel="modulepreload" href="/js/icon-list.js">
+  <link rel="modulepreload" href="/js/icon-picker.js">
+  <link rel="modulepreload" href="/js/home.js">
+  <link rel="modulepreload" href="/js/analytics.js">
+  <link rel="modulepreload" href="/js/categories.js">
+  <link rel="modulepreload" href="/js/expense-dialog.js">
+  <link rel="modulepreload" href="/js/login.js">
   <script type="module" src="/js/app.js"></script>
 </head>
 <body data-sidebar-layout>

@@ -19,6 +19,7 @@ const state = {
   categories: [],
   homeSummary: null,
   analyticsSummary: null,
+  flashId: null, // expense to highlight after saving
 };
 
 // ---------- data ----------
@@ -50,9 +51,19 @@ async function refresh({ categories = true } = {}) {
 }
 
 // ---------- render ----------
+let lastRenderedView = null;
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function render() {
   if (document.body.classList.contains('signed-out')) return; // login screen owns the page
   for (const v of VIEWS) $(`#v-${v}`).hidden = v !== state.view;
+  if (lastRenderedView !== state.view) {
+    const el = $(`#v-${state.view}`);
+    el.classList.remove('view-in');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('view-in');
+    lastRenderedView = state.view;
+  }
   $$('[data-view]').forEach(a => a.toggleAttribute('aria-current', a.dataset.view === state.view));
   $$('[data-month-label]').forEach(el => { el.textContent = monthLabel(state.month); });
 
@@ -99,14 +110,16 @@ async function goPeriod(period) {
 }
 
 // After any add/edit/delete: reload, and jump to the expense's month/day if it's elsewhere.
-async function onExpensesChanged(date) {
+async function onExpensesChanged(date, savedId = null) {
   if (date && monthOf(date) !== state.month) {
     state.month = monthOf(date);
     if (state.period.type === 'month') state.period = { type: 'month', key: state.month };
   }
   if (date) state.selectedDate = date;
   state.analyticsSummary = null;
+  state.flashId = savedId;
   await refresh();
+  state.flashId = null;
 }
 
 // ---------- events (one delegated listener) ----------
@@ -121,7 +134,16 @@ document.addEventListener('click', async e => {
   const id = el.dataset.id; // UUID string
   switch (el.dataset.action) {
     case 'add': openExpenseDialog({ date: el.dataset.date ?? (monthOf(state.selectedDate) === state.month ? state.selectedDate : todayISO()) }); break;
-    case 'pick-day': state.selectedDate = el.dataset.date; renderHome(state); break;
+    case 'pick-day': {
+      state.selectedDate = el.dataset.date;
+      renderHome(state);
+      // On phones the day's list sits below the calendar. If it starts in the lower half of the
+      // screen (only its heading showing) or above it, bring the list into view.
+      const panel = $('.day-panel');
+      const r = panel.getBoundingClientRect();
+      if (r.top > innerHeight * 0.5 || r.bottom < 0) panel.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+      break;
+    }
     case 'month-prev': goMonth(addMonths(state.month, -1)); break;
     case 'month-next': goMonth(addMonths(state.month, 1)); break;
     case 'month-today': goMonth(monthOf(todayISO())); break;
@@ -177,8 +199,10 @@ async function openDrill(categoryId) {
 }
 
 addEventListener('hashchange', () => showView(location.hash.slice(1)));
-let resizeTimer;
+let resizeTimer, lastWidth = innerWidth;
 addEventListener('resize', () => {
+  if (innerWidth === lastWidth) return; // height-only change (iPhone toolbar on scroll): nothing to redraw
+  lastWidth = innerWidth;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => { if (state.view === 'home') renderHome(state); else positionAvgLines($('#analytics')); }, 150);
 });

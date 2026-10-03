@@ -187,11 +187,10 @@ async function onSubmit(e) {
   const btn = $('#expense-save');
   btn.disabled = true;
   try {
-    if (editing) await api.updateExpense(editing.id, body);
-    else await api.createExpense(body);
+    const saved = editing ? await api.updateExpense(editing.id, body) : await api.createExpense(body);
     dlg().close();
     toast(editing ? 'Expense updated' : `Saved ${formatINR(share)} to ${body.category}`);
-    ctx.onChanged(body.spent_on);
+    ctx.onChanged(body.spent_on, saved?.id);
   } catch (err) {
     showError(err.message);
   } finally {
