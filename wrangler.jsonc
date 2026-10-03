@@ -37,7 +37,9 @@
     "TIME_ZONE": "Asia/Kolkata",
     "MAIL_FROM": "noreply@aakashjammula.com",
     // closed = only ALLOWED_EMAILS can sign in; invite = ALLOWED_EMAILS get accounts on first login; open = anyone
-    "AUTH_MODE": "closed"
+    "AUTH_MODE": "closed",
+    // Shown to emails that aren't allowed to sign in. Route it to your inbox with Email Routing.
+    "CONTACT_EMAIL": "contact@aakashjammula.com"
     // Secrets (not in git):
     //   npx wrangler secret put AUTH_SECRET      (random, e.g. `openssl rand -base64 32`)
     //   npx wrangler secret put ALLOWED_EMAILS   (comma-separated)

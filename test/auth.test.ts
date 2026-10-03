@@ -9,31 +9,50 @@ const sentTo = (email: string) => testOutbox.filter(m => m.to === email).length;
 /** Skip the 1-code-per-minute wait for an email (tests can't wait a minute). */
 const resetEmailLimits = (email: string) =>
   env.DB.prepare('DELETE FROM rate_limits WHERE key IN (?, ?)').bind(`code-email-min:${email}`, `code-email-hour:${email}`).run();
+const resetShortLimits = resetEmailLimits;
 
 describe('requesting a code', () => {
   it('rejects an invalid email', async () => {
     expect((await request('not-an-email')).status).toBe(400);
   });
 
-  it('emails a 6-digit code that is not stored in plain text', async () => {
+  it('emails an 8-digit code that is not stored in plain text', async () => {
     const email = newEmail();
     expect((await request(email)).status).toBe(200);
     const code = lastCodeFor(email);
-    expect(code).toMatch(/^\d{6}$/);
+    expect(code).toMatch(/^\d{8}$/);
     const row = await env.DB.prepare('SELECT code_hash FROM auth_codes WHERE email = ?').bind(email).first<{ code_hash: string }>();
     expect(row!.code_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(row!.code_hash).not.toContain(code);
   });
 
-  it('closed mode: same answer for everyone, but only allowed emails get a code', async () => {
+  it('closed mode: strangers get a clear "private app" message with the contact address, and no email', async () => {
     const stranger = newEmail();
-    const a = await request(stranger, { env: { AUTH_MODE: 'closed' } });
-    const b = await request('me@example.com', { env: { AUTH_MODE: 'closed' } });
-    expect(a.status).toBe(200);
-    expect(b.status).toBe(200);
-    expect(await a.json()).toEqual(await b.json()); // no account enumeration
+    const a = await request(stranger, { env: { AUTH_MODE: 'closed', CONTACT_EMAIL: 'contact@example.com' } });
+    expect(a.status).toBe(403);
+    expect((await json(a)).error).toBe("Hisaab is a private app and this email doesn't have access. To request access, email contact@example.com.");
     expect(sentTo(stranger)).toBe(0);
+
+    const b = await request('me@example.com', { env: { AUTH_MODE: 'closed' } });
+    expect(b.status).toBe(200);
     expect(sentTo('me@example.com')).toBe(1);
+  });
+
+  it('without CONTACT_EMAIL the message has no address', async () => {
+    const a = await request(newEmail(), { env: { AUTH_MODE: 'closed', CONTACT_EMAIL: '' } });
+    expect((await json(a)).error).toBe("Hisaab is a private app and this email doesn't have access.");
+  });
+
+  it('sends at most 10 codes per email per day (no inbox bombing)', async () => {
+    const email = newEmail();
+    const statuses = [];
+    for (let i = 0; i < 11; i++) {
+      await resetShortLimits(email); // skip the per-minute / per-hour waits; the daily cap remains
+      statuses.push((await request(email)).status);
+    }
+    expect(statuses.slice(0, 10).every(s => s === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
+    expect(sentTo(email)).toBe(10);
   });
 
   it('allows one code per minute per email', async () => {
@@ -84,7 +103,7 @@ describe('verifying a code', () => {
     const email = newEmail();
     await request(email);
     const code = lastCodeFor(email)!;
-    const wrong = code === '000000' ? '111111' : '000000';
+    const wrong = code === '00000000' ? '11111111' : '00000000';
     const first = await json(await verify(email, wrong));
     expect(first.error).toContain('4 tries left');
     for (let i = 0; i < 4; i++) await verify(email, wrong);
@@ -109,10 +128,30 @@ describe('verifying a code', () => {
     expect((await verify(email, second)).status).toBe(200);
   });
 
-  it('rejects malformed input with the same generic error', async () => {
+  it('rejects malformed input (including old 6-digit codes) with the same generic error', async () => {
     const a = await json(await verify('nobody@example.com', '12'));
     const b = await json(await verify('nobody@example.com', '123456'));
-    expect(a.error).toBe(b.error);
+    const c = await json(await verify('nobody@example.com', '12345678'));
+    expect(a.error).toBe(c.error);
+    expect(b.error).toBe(c.error);
+  });
+
+  it('10 wrong codes in a day lock sign-in until tomorrow, even with the right code', async () => {
+    const email = newEmail();
+    for (let round = 0; round < 2; round++) {           // 2 codes x 5 wrong guesses = 10 failures
+      await resetShortLimits(email);
+      await request(email);
+      const code = lastCodeFor(email)!;
+      const wrong = code === '00000000' ? '11111111' : '00000000';
+      for (let i = 0; i < 5; i++) await verify(email, wrong);
+    }
+    await resetShortLimits(email);
+    const locked = await request(email);
+    expect(locked.status).toBe(429);
+    expect((await json(locked)).error).toContain('locked until tomorrow');
+    // even a correct code for a code issued earlier can't get in today
+    const v = await verify(email, '12345678');
+    expect(v.status).toBe(429);
   });
 });
 

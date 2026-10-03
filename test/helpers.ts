@@ -30,7 +30,7 @@ export const json = async <T = any>(r: Response): Promise<T> => r.json() as Prom
 
 export function lastCodeFor(email: string): string | null {
   const msg = [...testOutbox].reverse().find(m => m.to === email);
-  return msg?.subject.match(/^(\d{6})/)?.[1] ?? null;
+  return msg?.subject.match(/^(\d{8})/)?.[1] ?? null;
 }
 
 export const newEmail = () => `u-${uuidv7()}@example.com`;

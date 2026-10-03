@@ -334,4 +334,11 @@ export class SqlRateLimiter implements RateLimiter {
     }
     return num(r?.count) > limit ? Math.ceil((start + windowMs - now.getTime()) / 1000) : 0;
   }
+
+  async count(key: string, windowSeconds: number, now: Date) {
+    const windowMs = windowSeconds * 1000;
+    const start = new Date(Math.floor(now.getTime() / windowMs) * windowMs).toISOString();
+    const r = await this.db.first<{ count: number }>('SELECT count FROM rate_limits WHERE key = ? AND window_start = ?', [key, start]);
+    return num(r?.count);
+  }
 }

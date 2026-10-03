@@ -34,9 +34,24 @@ export class AuthService {
     return { ok: ok && user?.status !== 'disabled', user };
   }
 
+  private notAllowedMessage(): string {
+    const app = this.d.config.appName, contact = this.d.config.contactEmail;
+    return contact
+      ? `${app} is a private app and this email doesn't have access. To request access, email ${contact}.`
+      : `${app} is a private app and this email doesn't have access.`;
+  }
+
+  /** Too many wrong codes today for this email: sign-in stays locked until the next UTC day. */
+  private async assertNotLockedToday(email: string) {
+    const fails = await this.d.limiter.count(`verify-fail-day:${email}`, 86_400, this.d.clock.now());
+    if (fails >= this.cfg.maxFailuresPerDay) {
+      throw new AppError('rate_limited', 'Too many wrong codes today. Sign-in is locked until tomorrow.');
+    }
+  }
+
   /**
-   * Step 1: email a code. Always resolves the same way for eligible and ineligible emails,
-   * so the login form can't be used to discover who has an account.
+   * Step 1: email a code. Emails that aren't allowed get a clear "private app" message
+   * instead of a code (this is a personal app, so saying so is preferred over hiding it).
    */
   async requestCode(rawEmail: unknown, ip: string): Promise<void> {
     if (!isEmail(rawEmail)) throw new AppError('validation', 'Enter a valid email address');
@@ -46,10 +61,13 @@ export class AuthService {
     await this.limit(`code-email-min:${email}`, 1, 60);
     await this.limit(`code-email-hour:${email}`, 5, 3600);
 
-    if (!(await this.eligible(email)).ok) return;
+    if (!(await this.eligible(email)).ok) throw new AppError('forbidden', this.notAllowedMessage());
+
+    await this.assertNotLockedToday(email);
+    await this.limit(`code-email-day:${email}`, this.cfg.maxCodesPerDay, 86_400); // caps code emails (inbox spam)
 
     const now = this.d.clock.now();
-    const code = generateCode();
+    const code = generateCode(this.cfg.codeDigits);
     await this.d.codes.replace({
       id: this.d.ids.next(), email,
       codeHash: await hmac(this.cfg.secret, `${email}:${code}`),
@@ -74,11 +92,13 @@ export class AuthService {
   /** Step 2: check the code; on success create the account if needed and open a new session. */
   async verify(rawEmail: unknown, rawCode: unknown, ip: string, userAgent: string | null) {
     await this.limit(`verify-ip:${ip}`, 30, 600);
-    if (!isEmail(rawEmail) || typeof rawCode !== 'string' || !/^\d{6}$/.test(rawCode.trim())) {
+    const codeRe = new RegExp(`^\\d{${this.cfg.codeDigits}}$`);
+    if (!isEmail(rawEmail) || typeof rawCode !== 'string' || !codeRe.test(rawCode.trim())) {
       throw new AppError('unauthorized', GENERIC_VERIFY_ERROR);
     }
     const email = normalizeEmail(rawEmail), code = rawCode.trim();
     const now = this.d.clock.now(), nowIso = now.toISOString();
+    await this.assertNotLockedToday(email);
 
     const rec = await this.d.codes.latestActive(email, nowIso);
     if (!rec || rec.attempts >= this.cfg.maxCodeAttempts) throw new AppError('unauthorized', GENERIC_VERIFY_ERROR);
@@ -86,6 +106,7 @@ export class AuthService {
     const hash = await hmac(this.cfg.secret, `${email}:${code}`);
     if (!timingSafeEqual(hash, rec.codeHash)) {
       await this.d.codes.incrementAttempts(rec.id);
+      await this.d.limiter.hit(`verify-fail-day:${email}`, Number.MAX_SAFE_INTEGER, 86_400, now); // counts toward the daily lock
       const left = this.cfg.maxCodeAttempts - rec.attempts - 1;
       throw new AppError('unauthorized', left > 0 ? `Wrong code. ${left} ${left === 1 ? 'try' : 'tries'} left.` : GENERIC_VERIFY_ERROR);
     }

@@ -18,8 +18,8 @@ function randomInt(max: number): number {
   }
 }
 
-/** 6-digit numeric code, e.g. "048213". */
-export function generateCode(digits = 6): string {
+/** Numeric code, e.g. "04821375" for 8 digits. */
+export function generateCode(digits = 8): string {
   return Array.from({ length: digits }, () => randomInt(10)).join('');
 }
 

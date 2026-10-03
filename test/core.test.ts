@@ -3,9 +3,9 @@ import { generateCode, generateToken, hmac, isEmail, normalizeEmail, timingSafeE
 import { parsePeriod } from '../src/core/dates.ts';
 
 describe('crypto', () => {
-  it('codes are 6 digits and vary', () => {
+  it('codes are 8 digits and vary', () => {
     const codes = new Set(Array.from({ length: 200 }, () => generateCode()));
-    for (const c of codes) expect(c).toMatch(/^\d{6}$/);
+    for (const c of codes) expect(c).toMatch(/^\d{8}$/);
     expect(codes.size).toBeGreaterThan(190);
   });
 

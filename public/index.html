@@ -57,7 +57,7 @@
 
       <form id="login-email-form" novalidate>
         <h3>Sign in</h3>
-        <p class="muted">We'll email you a 6-digit code. No password needed.</p>
+        <p class="muted">We'll email you an 8-digit code. No password needed.</p>
         <label data-field>Email
           <input name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
         </label>
@@ -68,7 +68,7 @@
         <h3>Check your email</h3>
         <p class="muted">Enter the code sent to <b id="login-sent-to"></b>. It expires in 10 minutes.</p>
         <label data-field>Code
-          <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required class="code-input">
+          <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="00000000" required class="code-input">
         </label>
         <button type="submit" class="large" style="width:100%">Sign in</button>
         <div class="login-links">

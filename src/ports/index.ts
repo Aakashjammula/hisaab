@@ -84,6 +84,8 @@ export interface AuthCodeRepo {
 export interface RateLimiter {
   /** Counts a hit; returns 0 when allowed, otherwise seconds until the window resets. */
   hit(key: string, limit: number, windowSeconds: number, now: Date): Promise<number>;
+  /** Current count in the window that contains `now` (does not count a hit). */
+  count(key: string, windowSeconds: number, now: Date): Promise<number>;
 }
 
 // ---------- infrastructure ----------

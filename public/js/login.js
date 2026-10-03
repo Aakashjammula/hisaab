@@ -1,8 +1,9 @@
-// Two-step sign-in: email → 6-digit code. The session is an HttpOnly cookie set by the server.
+// Two-step sign-in: email → 8-digit code. The session is an HttpOnly cookie set by the server.
 import { api } from './api.js';
 import { $ } from './ui.js';
 
 const RESEND_SECONDS = 60;
+const CODE_DIGITS = 8;
 let email = '', resendTimer = null, onSignedIn = () => {};
 
 const emailForm = () => $('#login-email-form');
@@ -65,16 +66,16 @@ export function initLogin(options) {
     busy(emailForm(), false);
   });
 
-  // keep only digits, submit automatically at 6
+  // keep only digits, submit automatically when complete
   codeForm().elements.code.addEventListener('input', e => {
-    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    if (e.target.value.length === 6) codeForm().requestSubmit();
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, CODE_DIGITS);
+    if (e.target.value.length === CODE_DIGITS) codeForm().requestSubmit();
   });
 
   codeForm().addEventListener('submit', async e => {
     e.preventDefault();
     const code = codeForm().elements.code.value;
-    if (code.length !== 6) return showError('Enter the 6-digit code from the email');
+    if (code.length !== CODE_DIGITS) return showError(`Enter the ${CODE_DIGITS}-digit code from the email`);
     busy(codeForm(), true);
     try {
       const me = await api.verifyCode(email, code);

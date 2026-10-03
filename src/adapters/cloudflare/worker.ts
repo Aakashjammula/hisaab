@@ -21,6 +21,7 @@ export interface WorkerEnv {
   TIME_ZONE: string;
   MAIL_FROM: string;
   AUTH_MODE: string;
+  CONTACT_EMAIL?: string;
   AUTH_SECRET?: string;
   ALLOWED_EMAILS?: string;
   /** "console" (local dev) or "memory" (tests); unset = real email */
@@ -33,6 +34,7 @@ function config(env: WorkerEnv): AppConfig {
   return {
     appName: env.APP_NAME || 'Hisaab',
     timeZone: env.TIME_ZONE || 'Asia/Kolkata',
+    contactEmail: env.CONTACT_EMAIL?.trim() || null,
     auth: {
       ...AUTH_DEFAULTS, mode, secret: env.AUTH_SECRET,
       allowedEmails: (env.ALLOWED_EMAILS ?? '').split(',').map(normalizeEmail).filter(Boolean),
