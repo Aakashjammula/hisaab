@@ -156,7 +156,11 @@ button { gap: 6px; }
 
 /* ===== Dialogs: bottom sheet on phone ===== */
 dialog.sheet { width: min(500px, 100vw - 2rem); }
-dialog .body { display: flex; flex-direction: column; gap: var(--space-4); padding-block: var(--space-4); }
+/* Header and footer stay put; only the middle scrolls. Oat makes .body overflow-y:auto, but it
+   only scrolls if the form is height-bounded, otherwise the dialog's overflow:hidden clips the footer. */
+dialog > form { display: flex; flex-direction: column; max-height: inherit; }
+dialog > form > header, dialog > form > footer { flex-shrink: 0; }
+dialog .body { display: flex; flex-direction: column; gap: var(--space-4); padding-block: var(--space-4); min-height: 0; overscroll-behavior: contain; }
 dialog form > footer > button { flex: 1; }
 dialog form > footer > #expense-delete { flex: 0 0 auto; margin-right: auto; }
 @media (max-width: 768px) {
