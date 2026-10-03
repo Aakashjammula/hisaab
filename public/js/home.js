@@ -14,14 +14,16 @@ export function kpiCards(s) {
     <article class="card kpi hero"><small>${icon('wallet')} My spend${samePoint ? ', so far' : ''}</small><b>${formatINR(s.my_spend)}</b></article>
     <article class="card kpi"><small>${icon(vs != null && vs < 0 ? 'trending-down' : 'trending-up')} vs ${esc(prevName)}${samePoint ? ', same day' : ''}</small>
       <b class="${vs == null ? 'muted' : vs > 0 ? 'up' : 'down'}">${vs == null ? '—' : `${vs > 0 ? '+' : ''}${vs}%`}</b></article>
-    <article class="card kpi"><small>${icon('users')} Paid for others</small><b>${formatINR(s.paid_for_others)}</b></article>
+    <article class="card kpi"><small>${icon('users')} Spent on others</small><b>${formatINR(s.paid_for_others)}</b></article>
     <article class="card kpi"><small>${icon('calendar-range')} Daily average</small><b>${elapsed > 0 ? formatINR(Math.round(s.my_spend / elapsed / 100) * 100) : '—'}</b></article>`;
 }
 
 /** Expense row with an Edit/Delete menu. */
 export function expenseRow(e, { menu = true, index = 0, flash = false } = {}) {
-  const tag = e.my_share === 0 ? '<span class="badge outline">For others</span>'
-    : e.my_share !== e.paid ? '<span class="badge outline">Split</span>' : '';
+  const names = e.shares.map(s => s.person);
+  const who = names.length ? `${esc(names[0])}${names.length > 1 ? ` +${names.length - 1}` : ''}` : 'others';
+  const tag = e.my_share === 0 ? `<span class="badge outline">For ${who}</span>`
+    : e.my_share !== e.paid ? `<span class="badge outline">${names.length ? `Split with ${who}` : 'Split'}</span>` : '';
   return `
     <div class="exp${flash ? ' flash' : ''}" style="--i:${index}">
       ${catIcon(e)}

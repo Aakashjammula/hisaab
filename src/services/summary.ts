@@ -22,6 +22,8 @@ export class SummaryService {
     // Baseline: average per month over months that actually have data (month view), or last year's total.
     const divisor = p.type === 'month' ? d.baseline.months : 1;
     const baseline = divisor ? { months: d.baseline.months, avg_total: Math.round(d.baseline.amount / divisor) } : null;
+    // Split amounts with no person attached (older splits, or a person who was deleted).
+    const unassigned = d.totals.others - d.byPerson.reduce((sum, x) => sum + x.amount, 0);
 
     return {
       period: { type: p.type, key: p.key, start: p.start, end: p.end, units: p.units, elapsed: p.elapsed, today: p.today, prev: p.prev },
@@ -39,6 +41,8 @@ export class SummaryService {
       trend: d.trend,
       top: d.top,
       splits: { count: d.splits.count, paid: d.splits.paid, my_share: d.splits.myShare },
+      by_person: d.byPerson.map(x => ({ id: x.id, name: x.name, amount: x.amount, count: x.count })),
+      unassigned,
     };
   }
 

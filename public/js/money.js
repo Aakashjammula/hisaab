@@ -51,8 +51,9 @@ export function formatShort(paise) {
 }
 const trim1 = n => (Math.round(n * 10) / 10).toString();
 
-/** Equal split: your share, rounded to the nearest paisa. "Others" is always paid - share. */
-export function splitShare(paidPaise, people) {
-  if (!Number.isInteger(people) || people < 1) return paidPaise;
-  return Math.round(paidPaise / people);
+/** Equal split into `people` parts that always add up to the total; leftover paise go to the first parts (you). */
+export function splitEvenly(paidPaise, people) {
+  if (!Number.isInteger(people) || people < 1) return [paidPaise];
+  const base = Math.floor(paidPaise / people), extra = paidPaise - base * people;
+  return Array.from({ length: people }, (_, i) => base + (i < extra ? 1 : 0));
 }

@@ -158,7 +158,7 @@ export const ICON_NAMES = new Set(CATEGORY_ICONS.map(i => i.name));
 export const UI_ICONS = [
   'calendar-days', 'chart-column', 'tags', 'plus', 'minus', 'check', 'x', 'chevron-left', 'chevron-right',
   'pencil', 'trash-2', 'ellipsis-vertical', 'trending-up', 'trending-down', 'users', 'calendar-range',
-  'calendar', 'calendar-x', 'sparkles', 'split', 'wallet', 'search', 'log-out', 'refresh-cw', 'circle-alert',
+  'calendar', 'calendar-x', 'sparkles', 'split', 'wallet', 'search', 'log-out', 'refresh-cw', 'circle-alert', 'user-plus',
 ];
 
 // Fixed palette; the Worker rejects anything else. [name, light, dark]

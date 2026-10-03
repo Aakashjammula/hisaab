@@ -2,15 +2,17 @@
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { AppError } from '../core/errors.ts';
-import type { Category, Expense, User } from '../core/types.ts';
+import type { Category, Expense, Person, User } from '../core/types.ts';
 import type { AuthService } from '../services/auth.ts';
 import type { CategoryService, ExpenseService } from '../services/expenses.ts';
+import type { PersonService } from '../services/people.ts';
 import type { SummaryService } from '../services/summary.ts';
 
 export interface AppDeps {
   auth: AuthService;
   expenses: ExpenseService;
   categories: CategoryService;
+  people: PersonService;
   summary: SummaryService;
   /** How this platform reports the caller's IP (e.g. CF-Connecting-IP, API Gateway sourceIp). */
   clientIp(req: Request): string;
@@ -26,9 +28,14 @@ const categoryJson = (c: Category & { count?: number; recent?: number }) => ({
   ...(c.count != null ? { count: c.count, recent: c.recent } : {}),
 });
 
+const personJson = (p: Person & { count?: number; recent?: number }) => ({
+  id: p.id, name: p.name, ...(p.count != null ? { count: p.count, recent: p.recent } : {}),
+});
+
 const expenseJson = (e: Expense) => ({
   id: e.id, paid: e.paid, my_share: e.myShare, note: e.note, spent_on: e.spentOn, created_at: e.createdAt,
   category_id: e.category.id, category: e.category.name, icon: e.category.icon, color: e.category.color,
+  shares: e.shares.map(s => ({ person_id: s.person.id, person: s.person.name, amount: s.amount })),
 });
 
 // ---------- helpers ----------
@@ -134,6 +141,18 @@ export function createApp(d: AppDeps) {
   app.get('/categories/:id/summary', async c => {
     const s = await d.summary.categorySummary(c.get('user').id, c.req.param('id'), periodQuery(c));
     return c.json({ ...s, category: categoryJson(s.category), expenses: s.expenses.map(expenseJson) });
+  });
+
+  app.get('/people', async c => c.json({ people: (await d.people.list(c.get('user').id)).map(personJson) }));
+  app.post('/people', async c => c.json({ ...personJson(await d.people.create(c.get('user').id, await body(c))), count: 0, recent: 0 }, 201));
+  app.patch('/people/:id', async c => c.json(personJson(await d.people.rename(c.get('user').id, c.req.param('id'), await body(c)))));
+  app.delete('/people/:id', async c => {
+    await d.people.delete(c.get('user').id, c.req.param('id'));
+    return c.json({ ok: true });
+  });
+  app.get('/people/:id/summary', async c => {
+    const s = await d.people.summary(c.get('user').id, c.req.param('id'), periodQuery(c));
+    return c.json({ ...s, person: personJson(s.person), expenses: s.expenses.map(expenseJson) });
   });
 
   app.get('/summary', async c => {

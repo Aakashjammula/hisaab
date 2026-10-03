@@ -25,6 +25,7 @@
   <link rel="modulepreload" href="/js/home.js">
   <link rel="modulepreload" href="/js/analytics.js">
   <link rel="modulepreload" href="/js/categories.js">
+  <link rel="modulepreload" href="/js/people.js">
   <link rel="modulepreload" href="/js/expense-dialog.js">
   <link rel="modulepreload" href="/js/login.js">
   <script type="module" src="/js/app.js"></script>
@@ -38,6 +39,7 @@
       <li><a href="#home" data-view="home"><svg class="i"><use href="/icons.svg#calendar-days"/></svg> Home</a></li>
       <li><a href="#analytics" data-view="analytics"><svg class="i"><use href="/icons.svg#chart-column"/></svg> Analytics</a></li>
       <li><a href="#categories" data-view="categories"><svg class="i"><use href="/icons.svg#tags"/></svg> Categories</a></li>
+      <li><a href="#people" data-view="people"><svg class="i"><use href="/icons.svg#users"/></svg> People</a></li>
     </ul>
   </nav>
   <footer>
@@ -141,6 +143,18 @@
       </div>
     </article>
   </section>
+
+  <!-- ===== PEOPLE ===== -->
+  <section id="v-people" hidden>
+    <div class="page-hdr">
+      <h2>People</h2>
+      <button class="outline small" data-action="new-person"><svg class="i"><use href="/icons.svg#user-plus"/></svg> New person</button>
+    </div>
+    <article class="card cat-card">
+      <p class="muted people-intro">The people you split bills with. Add them here or straight from “Split this bill”.</p>
+      <div id="person-list"></div>
+    </article>
+  </section>
 </main>
 
 <!-- Phone only -->
@@ -149,6 +163,7 @@
   <a href="#home" data-view="home"><svg class="i"><use href="/icons.svg#calendar-days"/></svg>Home</a>
   <a href="#analytics" data-view="analytics"><svg class="i"><use href="/icons.svg#chart-column"/></svg>Analytics</a>
   <a href="#categories" data-view="categories"><svg class="i"><use href="/icons.svg#tags"/></svg>Categories</a>
+  <a href="#people" data-view="people"><svg class="i"><use href="/icons.svg#users"/></svg>People</a>
 </nav>
 
 <!-- ===== Add / edit expense ===== -->
@@ -185,18 +200,20 @@
           <input name="split" type="checkbox" role="switch">
         </label>
         <div class="split-body" hidden>
-          <div class="counter">
-            <span>People, including me</span>
-            <menu class="buttons">
-              <li><button type="button" class="outline" data-people="-1" aria-label="Fewer people"><svg class="i"><use href="/icons.svg#minus"/></svg></button></li>
-              <li><button type="button" class="outline" disabled><output id="people">2</output></button></li>
-              <li><button type="button" class="outline" data-people="1" aria-label="More people"><svg class="i"><use href="/icons.svg#plus"/></svg></button></li>
-            </menu>
+          <div class="split-with">
+            <small>SPLIT WITH</small>
+            <div class="cat-pick" id="person-pick"></div>
+            <div class="hstack new-person" id="new-person" hidden>
+              <input id="new-person-name" placeholder="Name" maxlength="40" autocomplete="off" aria-label="New person's name" enterkeyhint="done">
+              <button type="button" class="small" data-add-person>Add</button>
+            </div>
           </div>
+          <div class="share-rows" id="share-rows"></div>
           <div class="split-res">
             <label><small>MY SHARE</small><input name="my_share" inputmode="decimal" autocomplete="off" aria-label="My share"></label>
-            <div><small>FOR OTHERS</small><b id="others-amt">₹0</b></div>
+            <div><small id="others-label">FOR OTHERS</small><b id="others-amt">₹0</b></div>
           </div>
+          <button type="button" class="outline small" data-split-equal><svg class="i"><use href="/icons.svg#split"/></svg> Split equally</button>
         </div>
       </div>
 
@@ -233,7 +250,22 @@
   </form>
 </dialog>
 
-<!-- ===== Category drill-down ===== -->
+<!-- ===== Person edit ===== -->
+<dialog id="person-dlg" class="sheet" closedby="any">
+  <form method="dialog" id="person-form" novalidate>
+    <header><h3 id="person-title">Person</h3></header>
+    <div class="body">
+      <label data-field>Name<input name="name" maxlength="40" required autocomplete="off"></label>
+      <div role="alert" data-variant="error" id="person-error" hidden></div>
+    </div>
+    <footer>
+      <button type="button" class="outline" data-close>Cancel</button>
+      <button type="submit"><svg class="i"><use href="/icons.svg#check"/></svg> Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===== Category / person drill-down ===== -->
 <dialog id="drill-dlg" class="sheet" closedby="any">
   <form method="dialog">
     <header><h3 id="drill-title"></h3><p id="drill-sub"></p></header>

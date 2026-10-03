@@ -51,7 +51,9 @@ button { gap: 6px; }
 /* ===== Phone: bottom nav + floating add ===== */
 .bottom-nav, .fab { display: none; }
 @media (max-width: 768px) {
+  /* one row: Oat puts main in row 2, which left an empty 1fr row above short pages */
   [data-sidebar-layout] { grid-template-rows: 1fr; }
+  [data-sidebar-layout] > main { grid-row: 1; }
   [data-sidebar] { display: none; }
   /* room for the bottom nav (≈70px) + the floating add button above it (56px) */
   main { padding: var(--space-3) var(--space-3) calc(160px + env(safe-area-inset-bottom)); }
@@ -176,9 +178,6 @@ dialog form > footer > #expense-delete { flex: 0 0 auto; margin-right: auto; }
 .split-box { background: var(--muted); border-radius: var(--radius-medium); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
 .split-toggle { justify-content: space-between; font-weight: 700; }
 .split-body { display: flex; flex-direction: column; gap: var(--space-3); }
-.counter { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.counter .buttons button { padding: 6px 10px; }
-.counter output { min-width: 28px; text-align: center; font-weight: 800; }
 .split-res { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .split-res > * { background: var(--card); border-radius: var(--radius-small); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
 .split-res small { color: var(--muted-foreground); font-size: .7rem; font-weight: 700; letter-spacing: .03em; }
@@ -186,6 +185,29 @@ dialog form > footer > #expense-delete { flex: 0 0 auto; margin-right: auto; }
 .split-res input { border: none; padding: 0; background: none; box-shadow: none; height: auto; }
 .split-res input:focus { outline: none; box-shadow: none; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+
+/* Split with people */
+.split-with { display: flex; flex-direction: column; gap: 6px; }
+.split-with > small, .share-rows small { color: var(--muted-foreground); font-size: .7rem; font-weight: 700; letter-spacing: .03em; }
+.new-person { gap: var(--space-2); }
+.new-person input { flex: 1; }
+.share-rows { display: flex; flex-direction: column; gap: 6px; }
+.share-rows:empty { display: none; }
+.share-row { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: var(--radius-small); padding: 6px 6px 6px 10px; }
+.share-row .name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-in { display: flex; align-items: baseline; gap: 2px; font-weight: 700; color: var(--muted-foreground); }
+.share-in input { width: 6.5em; text-align: right; font-size: 1rem; font-weight: 700; color: var(--foreground); border: none; background: none; box-shadow: none; padding: 2px 0; height: auto; }
+.share-in input:focus { outline: none; box-shadow: none; }
+.share-row button.ghost { padding: 6px; }
+.split-body > [data-split-equal] { align-self: flex-start; }
+
+/* Person avatar: initial on a tinted circle */
+.avatar {
+  --c: var(--cat-slate);
+  width: 38px; height: 38px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0;
+  font-weight: 800; color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent);
+}
+.avatar.sm { width: 28px; height: 28px; font-size: .8rem; }
 
 /* ===== Icon picker ===== */
 .picker { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-2); }
@@ -208,6 +230,8 @@ dialog form > footer > #expense-delete { flex: 0 0 auto; margin-right: auto; }
 .insights li svg.i { color: var(--c, var(--primary)); margin-top: 2px; }
 .catrow { display: flex; align-items: center; gap: 12px; padding: 8px 6px; margin: 0 -6px; border-radius: var(--radius-small); cursor: pointer; width: calc(100% + 12px); background: none; border: 0; color: inherit; font: inherit; text-align: left; }
 .catrow:hover { background: var(--muted); }
+.catrow.static { cursor: default; }
+.catrow.static:hover { background: none; }
 .catrow .bar { flex: 1; min-width: 0; }
 .catrow .bar > div:first-child { display: flex; justify-content: space-between; gap: 8px; font-size: .88rem; font-weight: 600; margin-bottom: 5px; }
 .catrow progress { height: 7px; }
@@ -257,6 +281,7 @@ dialog form > footer > #expense-delete { flex: 0 0 auto; margin-right: auto; }
 .cat-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
 .cat-item:first-child { border-top: 0; }
 .cat-item b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.people-intro { margin: 0 0 var(--space-2); font-size: .88rem; }
 
 /* ===== Account / log out ===== */
 .account { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
@@ -284,7 +309,7 @@ body.signed-out main { display: grid; place-items: center; min-height: 100dvh; p
 
 /* tap feedback, so a touch always feels registered */
 .cal button.d:active, .cat-pick button:active, .fab:active, .bottom-nav a:active, .catrow:active,
-.month-nav button:active, .split-box .buttons button:active { transform: scale(.95); }
+.month-nav button:active, .split-box button:active { transform: scale(.95); }
 .fab, .bottom-nav a, .cat-pick button, .catrow { transition: transform .08s ease-out; }
 
 /* switching Home / Analytics / Categories */

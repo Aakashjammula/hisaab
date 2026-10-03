@@ -1,7 +1,7 @@
 // Ports: everything the services need from the outside world.
 // Cloudflare implements these today (D1, Email Routing); AWS can implement them later (Postgres, SES)
 // without touching core/ or services/. Every data method is scoped by userId.
-import type { Category, CategoryInput, CategoryWithUsage, Expense, Id, Period, User } from '../core/types.ts';
+import type { Category, CategoryInput, CategoryWithUsage, Expense, Id, Period, Person, PersonWithUsage, User } from '../core/types.ts';
 
 // ---------- data ----------
 
@@ -14,17 +14,22 @@ export interface UserRepo {
 
 export interface NewCategory { id: Id; name: string; nameKey: string; icon: string; color: string; locked: boolean; createdAt: string }
 
+export interface NewPerson { id: Id; name: string; nameKey: string; createdAt: string }
+
 export interface NewExpense {
   id: Id; paid: number; myShare: number; note: string | null; spentOn: string; now: string;
   category: NewCategory; // inserted if no category with the same nameKey exists for the user
+  shares: { person: NewPerson; amount: number }[]; // each person inserted if missing (by nameKey)
 }
 
+export interface ExpenseFilter { categoryId?: Id; personId?: Id }
+
 export interface ExpenseRepo {
-  listInRange(userId: Id, start: string, end: string, categoryId?: Id): Promise<Expense[]>;
+  listInRange(userId: Id, start: string, end: string, filter?: ExpenseFilter): Promise<Expense[]>;
   get(userId: Id, id: Id): Promise<Expense | null>;
-  /** Ensures the category, then inserts — atomically. */
+  /** Ensures the category and people, then inserts the expense and its shares — atomically. */
   create(userId: Id, e: NewExpense): Promise<Expense>;
-  /** Returns false when the expense doesn't exist for this user. */
+  /** Replaces fields and shares. Returns false when the expense doesn't exist for this user. */
   update(userId: Id, id: Id, e: Omit<NewExpense, 'id'>): Promise<boolean>;
   delete(userId: Id, id: Id): Promise<boolean>;
 }
@@ -40,6 +45,16 @@ export interface CategoryRepo {
   deleteMovingToOther(userId: Id, id: Id): Promise<number>;
 }
 
+export interface PersonRepo {
+  list(userId: Id, recentSince: string): Promise<PersonWithUsage[]>;
+  get(userId: Id, id: Id): Promise<Person | null>;
+  /** Throws AppError('conflict') when the name is taken. */
+  create(userId: Id, p: NewPerson): Promise<Person>;
+  rename(userId: Id, id: Id, name: string, nameKey: string): Promise<Person | null>;
+  /** Their shares go too, so those amounts become "unassigned". Returns false when not found. */
+  delete(userId: Id, id: Id): Promise<boolean>;
+}
+
 export interface SummaryRepo {
   summary(userId: Id, p: Period): Promise<SummaryData>;
   categorySummary(userId: Id, categoryId: Id, p: Period): Promise<CategorySummaryData | null>;
@@ -51,6 +66,7 @@ export interface SummaryData {
   buckets: Bucket[];
   prevBuckets: Bucket[];
   byCategory: (Category & { amount: number; count: number })[];
+  byPerson: (Person & { amount: number; count: number })[];
   baseline: { months: number; amount: number; byCategory: Record<Id, number> };
   trend: Bucket[];
   top: Expense[];

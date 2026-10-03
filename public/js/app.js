@@ -1,14 +1,15 @@
 // App controller: one state object, one render() per view, re-render after every change.
 import { api, setSessionExpiredHandler } from './api.js';
-import { positionAvgLines, renderAnalytics, renderDrill } from './analytics.js';
+import { positionAvgLines, renderAnalytics, renderDrill, renderPersonDrill } from './analytics.js';
 import { deleteCategory, initCategories, openCategoryDialog, renderCategories } from './categories.js';
 import { deleteExpense, initExpenseDialog, openExpenseDialog } from './expense-dialog.js';
 import { expenseRow, renderHome } from './home.js';
+import { deletePerson, initPeople, openPersonDialog, renderPeople } from './people.js';
 import { $, $$, addMonths, confirmDialog, enableBackToClose, isoDate, monthLabel, monthOf, toast, todayISO } from './ui.js';
 import { formatINR } from './money.js';
 import { hideLogin, initLogin, showLogin } from './login.js';
 
-const VIEWS = ['home', 'analytics', 'categories'];
+const VIEWS = ['home', 'analytics', 'categories', 'people'];
 
 const state = {
   view: 'home',
@@ -17,6 +18,7 @@ const state = {
   period: { type: 'month', key: monthOf(todayISO()) }, // Analytics period
   expenses: [],
   categories: [],
+  people: [],
   homeSummary: null,
   analyticsSummary: null,
   flashId: null, // expense to highlight after saving
@@ -24,7 +26,9 @@ const state = {
 
 // ---------- data ----------
 async function loadCategories() {
-  state.categories = (await api.categories()).categories;
+  const [c, p] = await Promise.all([api.categories(), api.people()]);
+  state.categories = c.categories;
+  state.people = p.people;
 }
 async function loadMonth() {
   const month = state.month;
@@ -79,6 +83,7 @@ function render() {
     renderAnalytics($('#analytics'), state.analyticsSummary);
   }
   if (state.view === 'categories') renderCategories();
+  if (state.view === 'people') renderPeople();
 }
 
 // ---------- navigation ----------
@@ -166,6 +171,10 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'drill': openDrill(id); break;
+    case 'drill-person': openPersonDrill(id); break;
+    case 'new-person': openPersonDialog(); break;
+    case 'edit-person': openPersonDialog(state.people.find(p => p.id === id)); break;
+    case 'delete-person': deletePerson(state.people.find(p => p.id === id)); break;
     case 'new-category': openCategoryDialog(); break;
     case 'edit-category': openCategoryDialog(state.categories.find(c => c.id === id)); break;
     case 'delete-category': deleteCategory(state.categories.find(c => c.id === id)); break;
@@ -198,6 +207,20 @@ async function openDrill(categoryId) {
   }
 }
 
+async function openPersonDrill(personId) {
+  const p = state.period;
+  try {
+    const d = await api.personSummary(personId, p);
+    const view = renderPersonDrill(d, p.type === 'month' ? monthLabel(p.key) : p.key, expenseRow);
+    $('#drill-title').innerHTML = view.title;
+    $('#drill-sub').innerHTML = view.sub;
+    $('#drill-body').innerHTML = view.body;
+    $('#drill-dlg').showModal();
+  } catch (err) {
+    toast(err.message, 'danger');
+  }
+}
+
 addEventListener('hashchange', () => showView(location.hash.slice(1)));
 let resizeTimer, lastWidth = innerWidth;
 addEventListener('resize', () => {
@@ -209,7 +232,7 @@ addEventListener('resize', () => {
 
 // ---------- boot ----------
 function signedOut() {
-  Object.assign(state, { expenses: [], categories: [], homeSummary: null, analyticsSummary: null });
+  Object.assign(state, { expenses: [], categories: [], people: [], homeSummary: null, analyticsSummary: null });
   showLogin();
 }
 
@@ -225,7 +248,8 @@ async function startApp(me) {
 enableBackToClose();
 setSessionExpiredHandler(signedOut);
 initLogin({ onSignedIn: startApp });
-initExpenseDialog({ getCategories: () => state.categories, onChanged: onExpensesChanged });
+initExpenseDialog({ getCategories: () => state.categories, getPeople: () => state.people, onChanged: onExpensesChanged });
+initPeople({ getPeople: () => state.people, onChanged: () => { state.analyticsSummary = null; refresh(); } });
 initCategories({ getCategories: () => state.categories, onChanged: () => { state.analyticsSummary = null; refresh(); } });
 
 try {

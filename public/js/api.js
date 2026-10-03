@@ -42,6 +42,11 @@ export const api = {
   createCategory: body => request('POST', '/api/categories', body),
   updateCategory: (id, body) => request('PATCH', `/api/categories/${id}`, body),
   deleteCategory: id => request('DELETE', `/api/categories/${id}`),
+  people: () => request('GET', '/api/people'),
+  createPerson: body => request('POST', '/api/people', body),
+  updatePerson: (id, body) => request('PATCH', `/api/people/${id}`, body),
+  deletePerson: id => request('DELETE', `/api/people/${id}`),
+  personSummary: (id, period) => request('GET', `/api/people/${id}/summary?${period.type}=${period.key}`),
   summary: period => request('GET', `/api/summary?${period.type}=${period.key}`),
   categorySummary: (id, period) => request('GET', `/api/categories/${id}/summary?${period.type}=${period.key}`),
 };

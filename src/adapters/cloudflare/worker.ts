@@ -5,10 +5,11 @@ import { createApp } from '../../http/app.ts';
 import { AuthService } from '../../services/auth.ts';
 import { AUTH_DEFAULTS, type AppConfig, type AuthMode } from '../../services/config.ts';
 import { CategoryService, ExpenseService } from '../../services/expenses.ts';
+import { PersonService } from '../../services/people.ts';
 import { SummaryService } from '../../services/summary.ts';
 import type { Mailer } from '../../ports/index.ts';
 import {
-  SqlAuthCodeRepo, SqlCategoryRepo, SqlExpenseRepo, SqlRateLimiter, SqlSessionRepo, SqlSummaryRepo, SqlUserRepo,
+  SqlAuthCodeRepo, SqlCategoryRepo, SqlExpenseRepo, SqlPersonRepo, SqlRateLimiter, SqlSessionRepo, SqlSummaryRepo, SqlUserRepo,
 } from '../sql/repos.ts';
 import { D1Client } from './d1.ts';
 import { CloudflareMailer, ConsoleMailer, MemoryMailer } from './mailer.ts';
@@ -58,6 +59,7 @@ export function buildApp(env: WorkerEnv) {
   const shared = { expenses: new SqlExpenseRepo(db), categories: categoryRepo, ids, clock, config: cfg };
   const categories = new CategoryService(shared);
   const expenses = new ExpenseService(shared, categories);
+  const people = new PersonService({ ...shared, people: new SqlPersonRepo(db) }, expenses);
 
   return createApp({
     auth: new AuthService({
@@ -66,6 +68,7 @@ export function buildApp(env: WorkerEnv) {
     }),
     expenses,
     categories,
+    people,
     summary: new SummaryService(new SqlSummaryRepo(db), expenses),
     clientIp: req => req.headers.get('cf-connecting-ip') ?? 'unknown',
     log: (msg, err) => console.error(msg, err),

@@ -22,6 +22,22 @@ export interface CategoryWithUsage extends Category {
   recent: number;
 }
 
+export interface Person {
+  id: Id;
+  name: string;
+}
+
+export interface PersonWithUsage extends Person {
+  count: number;
+  recent: number;
+}
+
+/** One person's part of a split expense. */
+export interface Share {
+  person: Person;
+  amount: number;
+}
+
 export interface Expense {
   id: Id;
   paid: number;
@@ -30,6 +46,7 @@ export interface Expense {
   spentOn: string; // YYYY-MM-DD
   createdAt: string;
   category: Category;
+  shares: Share[];   // empty for unsplit expenses and older splits without people
 }
 
 export interface ExpenseInput {
@@ -40,6 +57,7 @@ export interface ExpenseInput {
   category: string;          // name; created on the fly if missing
   categoryIcon: string | null;
   categoryColor: string | null;
+  shares: { person: string; amount: number }[]; // person by name; created on the fly if missing
 }
 
 export interface CategoryInput {

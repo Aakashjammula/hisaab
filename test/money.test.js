@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanAmountInput, formatINR, formatShort, splitShare, toPaise, toRupeeString } from '../public/js/money.js';
+import { cleanAmountInput, formatINR, formatShort, splitEvenly, toPaise, toRupeeString } from '../public/js/money.js';
 import { suggestIcon } from '../public/js/icon-list.js';
 
 describe('toPaise', () => {
@@ -12,12 +12,12 @@ describe('toPaise', () => {
     'rejects %s', input => expect(toPaise(input)).toBeNull());
 });
 
-describe('splitShare', () => {
-  it('splits equally and the remainder is "others"', () => {
-    expect(splitShare(100000, 5)).toBe(20000);
-    const mine = splitShare(100000, 3);
-    expect(mine).toBe(33333);
-    expect(100000 - mine).toBe(66667); // always adds up to what was paid
+describe('splitEvenly', () => {
+  it('splits equally and always adds up to what was paid', () => {
+    expect(splitEvenly(100000, 5)).toEqual([20000, 20000, 20000, 20000, 20000]);
+    expect(splitEvenly(10000, 3)).toEqual([3334, 3333, 3333]);
+    expect(splitEvenly(1, 3)).toEqual([1, 0, 0]);
+    expect(splitEvenly(500, 1)).toEqual([500]);
   });
 });
 

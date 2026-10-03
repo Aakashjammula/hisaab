@@ -13,6 +13,16 @@ export const icon = (name, cls = 'i') => `<svg class="${cls}" aria-hidden="true"
 export const catIcon = (cat, size = '') =>
   `<span class="cat-ico ${size}" style="--c:var(--cat-${esc(cat.color)})">${icon(cat.icon)}</span>`;
 
+const AVATAR_COLORS = ['blue', 'violet', 'pink', 'orange', 'green', 'teal', 'amber', 'red'];
+/** Round initial for a person, coloured from their name so it stays the same everywhere. */
+export function personIcon(name, size = '') {
+  const n = String(name ?? '');
+  let h = 0;
+  for (const ch of n.toLowerCase()) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  const initial = [...n.trim()][0]?.toUpperCase() ?? '?';
+  return `<span class="avatar ${size}" style="--c:var(--cat-${AVATAR_COLORS[h % AVATAR_COLORS.length]})" aria-hidden="true">${esc(initial)}</span>`;
+}
+
 export function toast(message, variant = 'success') {
   if (window.ot?.toast) window.ot.toast(message, '', { variant });
 }

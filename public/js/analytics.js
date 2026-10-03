@@ -1,6 +1,6 @@
 import { formatINR } from './money.js';
 import { kpiCards } from './home.js';
-import { $$, catIcon, daysInMonth, esc, icon, isoDate, shortDate, shortMonth, weekdayMon0 } from './ui.js';
+import { $$, catIcon, daysInMonth, esc, icon, isoDate, personIcon, shortDate, shortMonth, weekdayMon0 } from './ui.js';
 
 const MIN_EXPECTED = 10000; // ignore "vs usual" for categories that usually cost < ₹100 (too noisy)
 const pct = (a, b) => Math.round((a - b) / b * 100);
@@ -43,7 +43,10 @@ function insights(s) {
     out.push(['chart-column', 'var(--primary)', `Most of your spending went to <b>${esc(top.name)}</b> (${Math.round(top.amount / s.my_spend * 100)}%).`]);
   }
   if (out.length < 3 && s.splits.count) {
-    out.push(['users', 'var(--primary)', `You fronted ${formatINR(s.splits.paid - s.splits.my_share)} for others across ${s.splits.count} split bill${s.splits.count > 1 ? 's' : ''}.`]);
+    const top = s.by_person[0];
+    out.push(['users', 'var(--primary)', top
+      ? `You spent ${formatINR(s.paid_for_others)} on others across ${s.splits.count} split bill${s.splits.count > 1 ? 's' : ''}, most on <b>${esc(top.name)}</b> (${formatINR(top.amount)}).`
+      : `You fronted ${formatINR(s.paid_for_others)} for others across ${s.splits.count} split bill${s.splits.count > 1 ? 's' : ''}.`]);
   }
   return out.slice(0, 3);
 }
@@ -85,17 +88,31 @@ function topCard(s) {
     </article>`;
 }
 
-function splitsCard(s) {
-  const sp = s.splits;
+function othersCard(s) {
+  const max = Math.max(1, s.by_person[0]?.amount ?? 0, s.unassigned);
+  const bills = n => `${n} bill${n === 1 ? '' : 's'}`;
+  const rows = s.by_person.map(p => `
+    <button class="catrow" data-action="drill-person" data-id="${p.id}" style="--c:var(--primary)">
+      ${personIcon(p.name)}
+      <div class="bar">
+        <div><span>${esc(p.name)}</span><span>${formatINR(p.amount)}</span></div>
+        <progress value="${p.amount}" max="${max}"></progress>
+        <div class="meta"><span>${bills(p.count)}</span></div>
+      </div>
+    </button>`).join('');
+  const unassigned = s.unassigned > 0 ? `
+    <div class="catrow static" style="--c:var(--cat-slate)">
+      <span class="avatar" style="--c:var(--cat-slate)" aria-hidden="true">?</span>
+      <div class="bar">
+        <div><span class="muted">Not assigned to anyone</span><span>${formatINR(s.unassigned)}</span></div>
+        <progress value="${s.unassigned}" max="${max}"></progress>
+      </div>
+    </div>` : '';
   return `
     <article class="card">
-      <header><h4>Split bills</h4></header>
-      ${sp.count ? `<div class="stat-grid">
-        <div><small>Split bills</small><b>${sp.count}</b></div>
-        <div><small>Paid for others</small><b>${formatINR(s.paid_for_others)}</b></div>
-        <div><small>Total paid on splits</small><b>${formatINR(sp.paid)}</b></div>
-        <div><small>Your avg share</small><b>${Math.round(sp.my_share / sp.paid * 100)}%</b></div>
-      </div>` : '<p class="muted">No split bills this period.</p>'}
+      <header><h4>Spent on others</h4><small>${s.splits.count ? `${formatINR(s.paid_for_others)} · ${bills(s.splits.count)}` : ''}</small></header>
+      ${rows || unassigned ? rows + unassigned : '<p class="muted">No split bills this period.</p>'}
+      ${rows ? '<p class="hint">Tap a person for their bills</p>' : ''}
     </article>`;
 }
 
@@ -203,7 +220,7 @@ export function renderAnalytics(el, s) {
         <ul>${ins.map(([i, c, t]) => `<li style="--c:${c}">${icon(i)}<span>${t}</span></li>`).join('')}</ul></article>` : ''}
       ${categoriesCard(s)}
       ${topCard(s)}
-      ${splitsCard(s)}
+      ${othersCard(s)}
       ${dowCard(s)}
       ${paceCard(s)}
       ${trendCard(s)}
@@ -241,5 +258,22 @@ export function renderDrill(d, periodLabel, expenseRow) {
         </tbody></table>
       </div>
       <div>${d.expenses.length ? d.expenses.map(e => expenseRow(e, { menu: false })).join('') : '<p class="muted">No expenses in this period.</p>'}</div>`,
+  };
+}
+
+/** Person drill-down dialog content: the bills they were part of. */
+export function renderPersonDrill(d, periodLabel, expenseRow) {
+  const theirs = d.expenses.reduce((a, e) => a + (e.shares.find(x => x.person_id === d.person.id)?.amount ?? 0), 0);
+  const total = d.expenses.reduce((a, e) => a + e.paid, 0);
+  return {
+    title: `<span class="hstack" style="gap:10px">${personIcon(d.person.name)} ${esc(d.person.name)}</span>`,
+    sub: esc(periodLabel),
+    body: `
+      <div class="mini-kpis">
+        <div><small>Spent on ${esc(d.person.name)}</small><b>${formatINR(theirs)}</b></div>
+        <div><small>Bills</small><b>${d.expenses.length}</b></div>
+        <div><small>Total paid</small><b>${formatINR(total)}</b></div>
+      </div>
+      <div>${d.expenses.length ? d.expenses.map(e => expenseRow(e, { menu: false })).join('') : '<p class="muted">No bills with them in this period.</p>'}</div>`,
   };
 }

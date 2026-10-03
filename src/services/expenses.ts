@@ -66,14 +66,18 @@ export class ExpenseService {
 
   list(userId: Id, q: PeriodQuery, categoryId?: string | null): Promise<Expense[]> {
     const p = this.period(q);
-    return this.d.expenses.listInRange(userId, p.start, p.end, categoryId ? requireId(categoryId, 'Category') : undefined);
+    return this.d.expenses.listInRange(userId, p.start, p.end, categoryId ? { categoryId: requireId(categoryId, 'Category') } : {});
   }
 
   private async toNew(userId: Id, input: ExpenseInput) {
+    const now = this.d.clock.now().toISOString();
     return {
-      paid: input.paid, myShare: input.myShare, note: input.note, spentOn: input.spentOn,
-      now: this.d.clock.now().toISOString(),
+      paid: input.paid, myShare: input.myShare, note: input.note, spentOn: input.spentOn, now,
       category: await this.categories.newCategory(userId, input.category, input.categoryIcon, input.categoryColor),
+      shares: input.shares.map(s => ({
+        person: { id: this.d.ids.next(), name: s.person, nameKey: nameKey(s.person), createdAt: now },
+        amount: s.amount,
+      })),
     };
   }
 

@@ -1,10 +1,10 @@
 // SQL implementations of the data ports. Every query is scoped by user_id.
 import { AppError } from '../../core/errors.ts';
 import { addMonths } from '../../core/dates.ts';
-import type { Category, CategoryInput, CategoryWithUsage, Expense, Id, Period, User } from '../../core/types.ts';
+import type { Category, CategoryInput, CategoryWithUsage, Expense, Id, Period, Person, PersonWithUsage, Share, User } from '../../core/types.ts';
 import type {
-  AuthCode, AuthCodeRepo, Bucket, CategoryRepo, CategorySummaryData, ExpenseRepo, NewCategory, NewExpense,
-  RateLimiter, Session, SessionRepo, SummaryData, SummaryRepo, UserRepo,
+  AuthCode, AuthCodeRepo, Bucket, CategoryRepo, CategorySummaryData, ExpenseFilter, ExpenseRepo, NewCategory, NewExpense,
+  NewPerson, PersonRepo, RateLimiter, Session, SessionRepo, SummaryData, SummaryRepo, UserRepo,
 } from '../../ports/index.ts';
 import { stmt, type SqlClient } from './client.ts';
 
@@ -23,7 +23,11 @@ interface ExpenseRow {
 const toExpense = (r: ExpenseRow): Expense => ({
   id: r.id, paid: Number(r.paid), myShare: Number(r.my_share), note: r.note, spentOn: r.spent_on, createdAt: r.created_at,
   category: { id: r.category_id, name: r.category_name, icon: r.icon, color: r.color, locked: !!r.locked },
+  shares: [],
 });
+
+interface PersonRow { id: string; name: string }
+const toPerson = (r: PersonRow): Person => ({ id: r.id, name: r.name });
 
 const EXPENSE_SELECT = `
   SELECT e.id, e.paid, e.my_share, e.note, e.spent_on, e.created_at,
@@ -36,7 +40,41 @@ const insertCategory = (userId: Id, c: NewCategory, ignoreExisting: boolean) => 
   c.id, userId, c.name, c.nameKey, c.icon, c.color, c.locked ? 1 : 0, c.createdAt,
 );
 
+const insertPerson = (userId: Id, p: NewPerson, ignoreExisting: boolean) => stmt(
+  `INSERT INTO people (id, user_id, name, name_key, created_at) VALUES (?, ?, ?, ?, ?)${ignoreExisting ? ' ON CONFLICT (user_id, name_key) DO NOTHING' : ''}`,
+  p.id, userId, p.name, p.nameKey, p.createdAt,
+);
+
+/** Ensures each person exists and links them; run in the same batch as the expense write. */
+const shareStmts = (userId: Id, expenseId: Id, shares: NewExpense['shares']) => [
+  ...shares.map(sh => insertPerson(userId, sh.person, true)),
+  ...shares.map(sh => stmt(
+    `INSERT INTO expense_shares (expense_id, person_id, user_id, amount)
+     SELECT ?, id, ?, ? FROM people WHERE user_id = ? AND name_key = ?`,
+    expenseId, userId, sh.amount, userId, sh.person.nameKey)),
+];
+
 const num = (v: unknown): number => Number(v ?? 0); // Postgres returns SUM/COUNT as strings
+
+const ID_CHUNK = 90; // D1 allows 100 bound parameters per statement
+
+/** Fills in each expense's shares (people sorted by name). */
+async function withShares(db: SqlClient, userId: Id, expenses: Expense[]): Promise<Expense[]> {
+  if (!expenses.length) return expenses;
+  const chunks: Id[][] = [];
+  for (let i = 0; i < expenses.length; i += ID_CHUNK) chunks.push(expenses.slice(i, i + ID_CHUNK).map(e => e.id));
+  const res = await db.batch(chunks.map(ids => stmt(
+    `SELECT s.expense_id, p.id, p.name, s.amount FROM expense_shares s
+     JOIN people p ON p.id = s.person_id AND p.user_id = s.user_id
+     WHERE s.user_id = ? AND s.expense_id IN (${ids.map(() => '?').join(', ')})
+     ORDER BY p.name_key, p.id`, userId, ...ids)));
+  const byExpense = new Map<Id, Share[]>();
+  for (const r of res.flatMap(x => x.rows) as (PersonRow & { expense_id: string; amount: number })[]) {
+    if (!byExpense.has(r.expense_id)) byExpense.set(r.expense_id, []);
+    byExpense.get(r.expense_id)!.push({ person: toPerson(r), amount: num(r.amount) });
+  }
+  return expenses.map(e => ({ ...e, shares: byExpense.get(e.id) ?? [] }));
+}
 
 // ---------- users ----------
 
@@ -72,18 +110,22 @@ export class SqlUserRepo implements UserRepo {
 export class SqlExpenseRepo implements ExpenseRepo {
   constructor(private db: SqlClient) {}
 
-  async listInRange(userId: Id, start: string, end: string, categoryId?: Id) {
+  async listInRange(userId: Id, start: string, end: string, filter: ExpenseFilter = {}) {
+    let where = 'e.user_id = ? AND e.spent_on >= ? AND e.spent_on < ?';
+    const params: unknown[] = [userId, start, end];
+    if (filter.categoryId) { where += ' AND e.category_id = ?'; params.push(filter.categoryId); }
+    if (filter.personId) {
+      where += ' AND EXISTS (SELECT 1 FROM expense_shares s WHERE s.expense_id = e.id AND s.user_id = e.user_id AND s.person_id = ?)';
+      params.push(filter.personId);
+    }
     const rows = await this.db.all<ExpenseRow>(
-      `${EXPENSE_SELECT} WHERE e.user_id = ? AND e.spent_on >= ? AND e.spent_on < ?${categoryId ? ' AND e.category_id = ?' : ''}
-       ORDER BY e.spent_on DESC, e.created_at DESC, e.id DESC`,
-      categoryId ? [userId, start, end, categoryId] : [userId, start, end],
-    );
-    return rows.map(toExpense);
+      `${EXPENSE_SELECT} WHERE ${where} ORDER BY e.spent_on DESC, e.created_at DESC, e.id DESC`, params);
+    return withShares(this.db, userId, rows.map(toExpense));
   }
 
   async get(userId: Id, id: Id) {
     const r = await this.db.first<ExpenseRow>(`${EXPENSE_SELECT} WHERE e.user_id = ? AND e.id = ?`, [userId, id]);
-    return r && toExpense(r);
+    return r && (await withShares(this.db, userId, [toExpense(r)]))[0]!;
   }
 
   async create(userId: Id, e: NewExpense) {
@@ -92,6 +134,7 @@ export class SqlExpenseRepo implements ExpenseRepo {
       stmt(`INSERT INTO expenses (id, user_id, category_id, paid, my_share, note, spent_on, created_at, updated_at)
             SELECT ?, ?, id, ?, ?, ?, ?, ?, ? FROM categories WHERE user_id = ? AND name_key = ?`,
         e.id, userId, e.paid, e.myShare, e.note, e.spentOn, e.now, e.now, userId, e.category.nameKey),
+      ...shareStmts(userId, e.id, e.shares),
     ]);
     return (await this.get(userId, e.id))!;
   }
@@ -104,6 +147,8 @@ export class SqlExpenseRepo implements ExpenseRepo {
               category_id = (SELECT id FROM categories WHERE user_id = ? AND name_key = ?)
             WHERE id = ? AND user_id = ?`,
         e.paid, e.myShare, e.note, e.spentOn, e.now, userId, e.category.nameKey, id, userId),
+      stmt('DELETE FROM expense_shares WHERE expense_id = ? AND user_id = ?', id, userId),
+      ...shareStmts(userId, id, e.shares),
     ]);
     return (res?.changes ?? 0) > 0;
   }
@@ -178,6 +223,57 @@ export class SqlCategoryRepo implements CategoryRepo {
   }
 }
 
+// ---------- people ----------
+
+export class SqlPersonRepo implements PersonRepo {
+  constructor(private db: SqlClient) {}
+
+  async list(userId: Id, recentSince: string): Promise<PersonWithUsage[]> {
+    const rows = await this.db.all<PersonRow & { count: number; recent: number }>(
+      `SELECT p.id, p.name, COUNT(e.id) AS count,
+              COALESCE(SUM(CASE WHEN e.spent_on >= ? THEN 1 ELSE 0 END), 0) AS recent
+       FROM people p
+       LEFT JOIN expense_shares s ON s.person_id = p.id AND s.user_id = p.user_id
+       LEFT JOIN expenses e ON e.id = s.expense_id AND e.user_id = s.user_id
+       WHERE p.user_id = ?
+       GROUP BY p.id, p.name, p.name_key
+       ORDER BY recent DESC, count DESC, p.name_key, p.id`,
+      [recentSince, userId],
+    );
+    return rows.map(r => ({ ...toPerson(r), count: num(r.count), recent: num(r.recent) }));
+  }
+
+  async get(userId: Id, id: Id) {
+    const r = await this.db.first<PersonRow>('SELECT id, name FROM people WHERE id = ? AND user_id = ?', [id, userId]);
+    return r && toPerson(r);
+  }
+
+  async create(userId: Id, p: NewPerson) {
+    try {
+      await this.db.batch([insertPerson(userId, p, false)]);
+    } catch (err) {
+      if (this.db.isUniqueViolation(err)) throw new AppError('conflict', `“${p.name}” already exists`);
+      throw err;
+    }
+    return (await this.get(userId, p.id))!;
+  }
+
+  async rename(userId: Id, id: Id, name: string, nameKey: string) {
+    try {
+      const r = await this.db.first<PersonRow>(
+        'UPDATE people SET name = ?, name_key = ? WHERE id = ? AND user_id = ? RETURNING id, name', [name, nameKey, id, userId]);
+      return r && toPerson(r);
+    } catch (err) {
+      if (this.db.isUniqueViolation(err)) throw new AppError('conflict', `“${name}” already exists`);
+      throw err;
+    }
+  }
+
+  async delete(userId: Id, id: Id) {
+    return (await this.db.run('DELETE FROM people WHERE id = ? AND user_id = ?', [id, userId])).changes > 0;
+  }
+}
+
 // ---------- analytics ----------
 
 const last12 = (lastKey: string) => Array.from({ length: 12 }, (_, i) => addMonths(lastKey, i - 11));
@@ -213,6 +309,12 @@ export class SqlSummaryRepo implements SummaryRepo {
             ORDER BY e.my_share DESC, e.spent_on DESC LIMIT 5`, ...cur),
       stmt(`SELECT COUNT(*) AS count, COALESCE(SUM(paid), 0) AS paid, COALESCE(SUM(my_share), 0) AS my_share
             FROM expenses WHERE ${R} AND paid > my_share`, ...cur),
+      stmt(`SELECT p.id, p.name, SUM(s.amount) AS amount, COUNT(*) AS count
+            FROM expense_shares s
+            JOIN people p ON p.id = s.person_id AND p.user_id = s.user_id
+            JOIN expenses e ON e.id = s.expense_id AND e.user_id = s.user_id
+            WHERE e.user_id = ? AND e.spent_on >= ? AND e.spent_on < ?
+            GROUP BY p.id, p.name, p.name_key ORDER BY amount DESC, p.name_key`, ...cur),
     ]);
     const rows = <T>(i: number) => (res[i]?.rows ?? []) as T[];
     type B = { k: string; amount: number; count?: number };
@@ -234,8 +336,10 @@ export class SqlSummaryRepo implements SummaryRepo {
         byCategory: Object.fromEntries(rows<{ id: string; amount: number }>(4).map(r => [r.id, num(r.amount)])),
       },
       trend: keys.map(k => ({ k, amount: trendMap[k] ?? 0 })),
-      top: rows<ExpenseRow>(7).map(toExpense),
+      top: await withShares(this.db, userId, rows<ExpenseRow>(7).map(toExpense)),
       splits: { count: num(sp.count), paid: num(sp.paid), myShare: num(sp.my_share) },
+      byPerson: rows<PersonRow & { amount: number; count: number }>(9)
+        .map(r => ({ ...toPerson(r), amount: num(r.amount), count: num(r.count) })),
     };
   }
 
@@ -254,7 +358,7 @@ export class SqlSummaryRepo implements SummaryRepo {
     const m = Object.fromEntries((hist?.rows as { k: string; amount: number }[]).map(r => [r.k, num(r.amount)]));
     return {
       category: toCategory(c),
-      expenses: (list?.rows as ExpenseRow[]).map(toExpense),
+      expenses: await withShares(this.db, userId, (list?.rows as ExpenseRow[]).map(toExpense)),
       trend: keys.map(k => ({ k, amount: m[k] ?? 0 })),
     };
   }
