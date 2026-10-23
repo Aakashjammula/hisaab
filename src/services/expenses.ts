@@ -1,9 +1,10 @@
 import { suggestIcon, COLORS } from '../../public/js/icon-list.js';
 import { daysBefore, parsePeriod, todayIn } from '../core/dates.ts';
-import { AppError, notFound } from '../core/errors.ts';
+import { toPaise } from '../../public/js/money.js';
+import { AppError, invalid, notFound } from '../core/errors.ts';
 import { isId, nameKey, parseCategoryInput, parseExpenseInput } from '../core/validate.ts';
 import type { Category, CategoryWithUsage, Expense, ExpenseInput, Id, Period } from '../core/types.ts';
-import type { CategoryRepo, Clock, ExpenseRepo, IdGenerator, NewCategory } from '../ports/index.ts';
+import type { CategoryRepo, Clock, ExpenseFilter, ExpenseRepo, IdGenerator, NewCategory } from '../ports/index.ts';
 import type { AppConfig } from './config.ts';
 
 export interface PeriodQuery { month?: string | null; year?: string | null }
@@ -11,6 +12,14 @@ export interface PeriodQuery { month?: string | null; year?: string | null }
 interface Deps { expenses: ExpenseRepo; categories: CategoryRepo; ids: IdGenerator; clock: Clock; config: AppConfig }
 
 const requireId = (raw: string, what: string): Id => (isId(raw) ? raw : notFound(what));
+
+export interface ExpenseSearch { categoryId?: string | null; personId?: string | null; text?: string | null; minAmount?: unknown; maxAmount?: unknown }
+
+/** Optional rupee bound -> paise; null when absent. */
+function amountBound(raw: unknown, what: string): number | null {
+  if (raw == null || raw === '') return null;
+  return toPaise(raw) ?? invalid(`${what} must be a number with at most 2 decimals`);
+}
 
 export class CategoryService {
   constructor(private d: Deps) {}
@@ -67,6 +76,20 @@ export class ExpenseService {
   list(userId: Id, q: PeriodQuery, categoryId?: string | null): Promise<Expense[]> {
     const p = this.period(q);
     return this.d.expenses.listInRange(userId, p.start, p.end, categoryId ? { categoryId: requireId(categoryId, 'Category') } : {});
+  }
+
+  /** list() plus filters for Claude: person, text in note/category/people, and a range on the amount paid. */
+  async search(userId: Id, q: PeriodQuery, s: ExpenseSearch): Promise<Expense[]> {
+    const p = this.period(q);
+    const filter: ExpenseFilter = {};
+    if (s.categoryId) filter.categoryId = requireId(s.categoryId, 'Category');
+    if (s.personId) filter.personId = requireId(s.personId, 'Person');
+    const min = amountBound(s.minAmount, 'min_amount'), max = amountBound(s.maxAmount, 'max_amount');
+    const text = s.text?.trim().toLowerCase();
+    const list = await this.d.expenses.listInRange(userId, p.start, p.end, filter);
+    return list.filter(e =>
+      (min == null || e.paid >= min) && (max == null || e.paid <= max) &&
+      (!text || [e.note ?? '', e.category.name, ...e.shares.map(x => x.person.name)].some(v => v.toLowerCase().includes(text))));
   }
 
   private async toNew(userId: Id, input: ExpenseInput) {

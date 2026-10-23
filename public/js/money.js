@@ -34,6 +34,11 @@ export function toRupeeString(paise) {
   return p ? `${r}.${String(p).padStart(2, '0')}` : String(r);
 }
 
+/** Paise -> "450.00": always 2 decimals, for machine-readable output (MCP tools). */
+export function toRupeeFixed(paise) {
+  return `${Math.trunc(paise / 100)}.${String(paise % 100).padStart(2, '0')}`;
+}
+
 const fmtWhole = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 const fmtExact = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 });
 

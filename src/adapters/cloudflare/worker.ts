@@ -75,6 +75,7 @@ export function buildApp(env: WorkerEnv) {
     summary: new SummaryService(new SqlSummaryRepo(db), expenses),
     oauth: new OAuthService({ oauth: new SqlOAuthRepo(db), users, limiter, clock, ids, config: cfg }),
     limiter,
+    timeZone: cfg.timeZone,
     clientIp: req => req.headers.get('cf-connecting-ip') ?? 'unknown',
     log: (msg, err) => console.error(msg, err),
   });

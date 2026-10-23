@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanAmountInput, formatINR, formatShort, splitEvenly, toPaise, toRupeeString } from '../public/js/money.js';
+import { cleanAmountInput, formatINR, formatShort, splitEvenly, toPaise, toRupeeFixed, toRupeeString } from '../public/js/money.js';
 import { suggestIcon } from '../public/js/icon-list.js';
 
 describe('toPaise', () => {
@@ -43,4 +43,9 @@ describe('cleanAmountInput', () => {
     ['dwdwdwdw', ''], ['1a2b3', '123'], ['12.345', '12.34'], ['1.2.3', '1.23'], ['.5', '0.5'],
     ['₹1,000', '1000'], ['-50', '50'], ['123456789', '1234567'], ['1e5', '15'], ['249.50', '249.50'],
   ])('%s -> %s', (input, out) => expect(cleanAmountInput(input)).toBe(out));
+});
+
+describe('toRupeeFixed', () => {
+  it.each([[45000, '450.00'], [1, '0.01'], [44950, '449.50'], [0, '0.00'], [100000000, '1000000.00']])(
+    '%i paise -> %s', (paise, s) => expect(toRupeeFixed(paise)).toBe(s));
 });

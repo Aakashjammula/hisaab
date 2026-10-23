@@ -2,7 +2,7 @@
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie } from 'hono/cookie';
 import { AppError } from '../core/errors.ts';
-import type { Category, Expense, Person, User } from '../core/types.ts';
+import type { User } from '../core/types.ts';
 import type { RateLimiter } from '../ports/index.ts';
 import type { AuthService } from '../services/auth.ts';
 import type { CategoryService, ExpenseService } from '../services/expenses.ts';
@@ -10,6 +10,8 @@ import type { OAuthService } from '../services/oauth.ts';
 import type { PersonService } from '../services/people.ts';
 import type { SummaryService } from '../services/summary.ts';
 import { cookieName, isHttps, setSessionCookie } from './cookies.ts';
+import { categoryJson, expenseJson, personJson } from './json.ts';
+import { mcpRoutes } from './mcp.ts';
 import { oauthRoutes } from './oauth.ts';
 
 export interface AppDeps {
@@ -20,29 +22,14 @@ export interface AppDeps {
   summary: SummaryService;
   oauth: OAuthService;
   limiter: RateLimiter;
+  /** IANA zone "today" is reckoned in (shown to Claude by get_context). */
+  timeZone: string;
   /** How this platform reports the caller's IP (e.g. CF-Connecting-IP, API Gateway sourceIp). */
   clientIp(req: Request): string;
   log?(message: string, err?: unknown): void;
 }
 
 type Env = { Variables: { user: User } };
-
-// ---------- JSON shapes (the API contract the frontend uses) ----------
-
-const categoryJson = (c: Category & { count?: number; recent?: number }) => ({
-  id: c.id, name: c.name, icon: c.icon, color: c.color, locked: c.locked,
-  ...(c.count != null ? { count: c.count, recent: c.recent } : {}),
-});
-
-const personJson = (p: Person & { count?: number; recent?: number }) => ({
-  id: p.id, name: p.name, ...(p.count != null ? { count: p.count, recent: p.recent } : {}),
-});
-
-const expenseJson = (e: Expense) => ({
-  id: e.id, paid: e.paid, my_share: e.myShare, note: e.note, spent_on: e.spentOn, created_at: e.createdAt,
-  category_id: e.category.id, category: e.category.name, icon: e.category.icon, color: e.category.color,
-  shares: e.shares.map(s => ({ person_id: s.person.id, person: s.person.name, amount: s.amount })),
-});
 
 // ---------- helpers ----------
 
@@ -63,12 +50,7 @@ export function createApp(d: AppDeps) {
   app.route('/api', apiRoutes(d));
   app.route('/', oauthRoutes(d));
 
-  // Stub until the MCP endpoint lands: every request is unauthenticated, pointing Claude at the OAuth metadata.
-  app.post('/mcp', c => {
-    c.header('Cache-Control', 'no-store');
-    c.header('WWW-Authenticate', `Bearer resource_metadata="${new URL(c.req.url).origin}/.well-known/oauth-protected-resource"`);
-    return c.json({ error: 'invalid_token' }, 401);
-  });
+  app.route('/mcp', mcpRoutes(d));
 
   app.onError((err, c) => {
     d.log?.('Unhandled error', err);
