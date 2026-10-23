@@ -27,6 +27,9 @@ export const AUTH_DEFAULTS = {
   sessionIdleDays: 30, sessionMaxDays: 90,
 } as const;
 
+/** MCP connector OAuth server: allowed https redirect hosts (plus http loopback) and lifetimes in seconds. */
+export const OAUTH_DEFAULTS = { redirectHosts: ['claude.ai', 'claude.com'], accessTokenSeconds: 3600, codeSeconds: 60, reuseGraceSeconds: 60 } as const;
+
 /** Categories every new user starts with. "Other" is locked: deleted categories' expenses move there. */
 export const DEFAULT_CATEGORIES = [
   { name: 'Food', icon: 'utensils', color: 'orange' },
