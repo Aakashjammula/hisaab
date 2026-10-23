@@ -97,9 +97,16 @@ describe('registration', () => {
     await oauthFails(s.register({ redirect_uris: Array(6).fill(CLAUDE_CB) }, ip()), 'invalid_redirect_uri');
   });
 
+  it('register rejects claude hosts on any path but the callback', async () => {
+    const s = service();
+    for (const uri of ['https://claude.ai/other', 'https://claude.ai/', 'https://claude.com/cb', 'https://claude.ai/api/mcp/auth_callback?x=1']) {
+      await oauthFails(s.register({ redirect_uris: [uri] }, ip()), 'invalid_redirect_uri');
+    }
+  });
+
   it('register accepts claude.ai and loopback', async () => {
     const s = service();
-    const uris = [CLAUDE_CB, 'https://claude.com/cb', 'http://localhost:33418/callback', 'http://127.0.0.1:5000/cb'];
+    const uris = [CLAUDE_CB, 'https://claude.com/api/mcp/auth_callback', 'http://localhost:33418/callback', 'http://127.0.0.1:5000/cb'];
     const res = await s.register({ client_name: 'x'.repeat(150), redirect_uris: uris }, ip());
     expect(res.client_id).toEqual(expect.any(String));
     expect(res.redirect_uris).toEqual(uris);

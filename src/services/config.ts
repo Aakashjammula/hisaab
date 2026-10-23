@@ -28,7 +28,11 @@ export const AUTH_DEFAULTS = {
 } as const;
 
 /** MCP connector OAuth server: allowed https redirect hosts (plus http loopback) and lifetimes in seconds. */
-export const OAUTH_DEFAULTS = { redirectHosts: ['claude.ai', 'claude.com'], accessTokenSeconds: 3600, codeSeconds: 60, reuseGraceSeconds: 60 } as const;
+/** Claude's https OAuth callbacks, exact (any other path on these hosts could leak a code via an open redirect). */
+export const OAUTH_DEFAULTS = {
+  claudeRedirectUris: ['https://claude.ai/api/mcp/auth_callback', 'https://claude.com/api/mcp/auth_callback'],
+  accessTokenSeconds: 3600, codeSeconds: 60, reuseGraceSeconds: 60,
+} as const;
 
 /** Categories every new user starts with. "Other" is locked: deleted categories' expenses move there. */
 export const DEFAULT_CATEGORIES = [

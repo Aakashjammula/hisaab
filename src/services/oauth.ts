@@ -30,13 +30,13 @@ function param(v: unknown, name: string): string {
   return v;
 }
 
-/** https on a Claude host (default port), or http on a loopback host (any port, RFC 8252). No fragment or userinfo. */
+/** One of Claude's exact https callbacks, or http on a loopback host (any port, RFC 8252). No fragment or userinfo. */
 function allowedRedirect(raw: unknown): URL | null {
   if (typeof raw !== 'string' || raw.length > MAX_PARAM || raw.includes('#')) return null;
   let u: URL;
   try { u = new URL(raw); } catch { return null; }
   if (u.username || u.password) return null;
-  if (u.protocol === 'https:' && u.port === '' && (OAUTH_DEFAULTS.redirectHosts as readonly string[]).includes(u.hostname)) return u;
+  if (u.protocol === 'https:' && (OAUTH_DEFAULTS.claudeRedirectUris as readonly string[]).includes(raw)) return u;
   if (u.protocol === 'http:' && LOOPBACK_HOSTS.has(u.hostname)) return u;
   return null;
 }

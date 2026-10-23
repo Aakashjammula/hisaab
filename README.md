@@ -41,7 +41,7 @@ Reading runs freely. Adding, editing and deleting are marked so Claude asks you 
 - **No account enumeration:** the response is the same whether or not an email may sign in.
 - **Sessions:** a 256-bit token in an HttpOnly, Secure, SameSite=Lax `__Host-` cookie. Only its SHA-256 is stored. Sessions expire after 30 days idle and 90 days at most, and logging out deletes them on the server. There's also a "Log out everywhere" option.
 - **Claude (OAuth 2.1):**
-  - PKCE S256 only. Dynamic client registration, with redirect URIs limited to claude.ai, claude.com and localhost.
+  - PKCE S256 only. Dynamic client registration, with redirect URIs limited to Claude's exact callback URLs on claude.ai and claude.com (in `OAUTH_DEFAULTS`), plus localhost for Claude Code.
   - Codes, access tokens and refresh tokens are stored only as SHA-256 hashes. Codes last 60 seconds and are single use. Access tokens last 1 hour.
   - Refresh tokens rotate on every use. Reusing an old one more than 60 seconds after rotation revokes the whole connection.
   - A connection follows the session limits: 30 days idle, 90 days at most. **Disconnect** on the Account card and **Log out everywhere** both cut Claude off.
