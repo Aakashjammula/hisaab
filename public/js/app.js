@@ -2,6 +2,7 @@
 import { api, setSessionExpiredHandler } from './api.js';
 import { positionAvgLines, renderAnalytics, renderDrill, renderPersonDrill } from './analytics.js';
 import { deleteCategory, initCategories, openCategoryDialog, renderCategories } from './categories.js';
+import { disconnectApp, renderConnections } from './connections.js';
 import { deleteExpense, initExpenseDialog, openExpenseDialog } from './expense-dialog.js';
 import { expenseRow, renderHome } from './home.js';
 import { deletePerson, initPeople, openPersonDialog, renderPeople } from './people.js';
@@ -82,7 +83,7 @@ function render() {
     });
     renderAnalytics($('#analytics'), state.analyticsSummary);
   }
-  if (state.view === 'categories') renderCategories();
+  if (state.view === 'categories') { renderCategories(); renderConnections(); }
   if (state.view === 'people') renderPeople();
 }
 
@@ -178,6 +179,7 @@ document.addEventListener('click', async e => {
     case 'new-category': openCategoryDialog(); break;
     case 'edit-category': openCategoryDialog(state.categories.find(c => c.id === id)); break;
     case 'delete-category': deleteCategory(state.categories.find(c => c.id === id)); break;
+    case 'disconnect-app': disconnectApp(id); break;
     case 'logout':
       if (await confirmDialog('Log out?', 'You will need to sign in again on this device.', 'Log out')) {
         await api.logout().catch(() => {});
@@ -185,7 +187,7 @@ document.addEventListener('click', async e => {
       }
       break;
     case 'logout-everywhere':
-      if (await confirmDialog('Log out everywhere?', 'This signs you out on every phone and computer, including this one.', 'Log out everywhere')) {
+      if (await confirmDialog('Log out everywhere?', 'This signs you out on every phone and computer, including this one, and disconnects Claude.', 'Log out everywhere')) {
         await api.logoutEverywhere().catch(() => {});
         signedOut();
       }

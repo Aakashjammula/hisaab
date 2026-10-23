@@ -292,6 +292,9 @@ dialog form > footer > #expense-delete { flex: 0 0 auto; margin-right: auto; }
 .account small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-card { margin-top: var(--space-4); }
 .account-card .account { margin-top: 0; }
+.conn-title { margin: var(--space-4) 0 var(--space-2); }
+.conn-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) 0; }
+.conn-item + .conn-item { border-top: 1px solid var(--border); }
 
 /* ===== Sign in ===== */
 body.signed-out [data-sidebar], body.signed-out .bottom-nav, body.signed-out .fab { display: none !important; }

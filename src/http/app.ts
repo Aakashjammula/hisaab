@@ -117,7 +117,18 @@ function apiRoutes(d: AppDeps) {
 
   app.post('/auth/logout-everywhere', async c => {
     await d.auth.logoutEverywhere(c.get('user').id);
+    await d.oauth.disconnectAll(c.get('user').id); // "everywhere" includes Claude
     deleteCookie(c, cookieName(c), { path: '/', secure: isHttps(c) });
+    return c.json({ ok: true });
+  });
+
+  // Apps (Claude) connected through OAuth, for the Account card.
+  app.get('/connections', async c => c.json({
+    connections: (await d.oauth.listConnections(c.get('user').id))
+      .map(x => ({ id: x.id, name: x.clientName, created_at: x.createdAt, last_used_at: x.lastUsedAt })),
+  }));
+  app.delete('/connections/:id', async c => {
+    await d.oauth.disconnect(c.get('user').id, c.req.param('id'));
     return c.json({ ok: true });
   });
 
