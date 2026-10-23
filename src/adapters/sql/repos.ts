@@ -4,7 +4,7 @@ import { addMonths } from '../../core/dates.ts';
 import type { Category, CategoryInput, CategoryWithUsage, Expense, Id, Period, Person, PersonWithUsage, Share, User } from '../../core/types.ts';
 import type {
   AuthCode, AuthCodeRepo, Bucket, CategoryRepo, CategorySummaryData, ExpenseFilter, ExpenseRepo, NewCategory, NewExpense,
-  NewPerson, PersonRepo, RateLimiter, Session, SessionRepo, SummaryData, SummaryRepo, UserRepo,
+  NewPerson, OAuthClient, OAuthCode, OAuthConnection, OAuthRepo, OAuthToken, PersonRepo, RateLimiter, Session, SessionRepo, SummaryData, SummaryRepo, UserRepo,
 } from '../../ports/index.ts';
 import { stmt, type SqlClient } from './client.ts';
 
@@ -444,5 +444,107 @@ export class SqlRateLimiter implements RateLimiter {
     const start = new Date(Math.floor(now.getTime() / windowMs) * windowMs).toISOString();
     const r = await this.db.first<{ count: number }>('SELECT count FROM rate_limits WHERE key = ? AND window_start = ?', [key, start]);
     return num(r?.count);
+  }
+}
+
+// ---------- oauth ----------
+
+interface ConnectionRow {
+  id: string; user_id: string; client_id: string; client_name: string;
+  created_at: string; last_used_at: string; expires_at: string; user_agent: string | null;
+}
+const toConnection = (r: ConnectionRow): OAuthConnection => ({
+  id: r.id, userId: r.user_id, clientId: r.client_id, clientName: r.client_name,
+  createdAt: r.created_at, lastUsedAt: r.last_used_at, expiresAt: r.expires_at, userAgent: r.user_agent,
+});
+const CONNECTION_SELECT = `SELECT c.id, c.user_id, c.client_id, k.name AS client_name, c.created_at, c.last_used_at, c.expires_at, c.user_agent
+  FROM oauth_connections c JOIN oauth_clients k ON k.id = c.client_id`;
+
+export class SqlOAuthRepo implements OAuthRepo {
+  constructor(private db: SqlClient) {}
+
+  async createClient(c: OAuthClient) {
+    await this.db.run('INSERT INTO oauth_clients (id, name, redirect_uris, created_at) VALUES (?, ?, ?, ?)',
+      [c.id, c.name, JSON.stringify(c.redirectUris), c.createdAt]);
+  }
+
+  async getClient(id: Id) {
+    const r = await this.db.first<{ id: string; name: string; redirect_uris: string; created_at: string }>(
+      'SELECT id, name, redirect_uris, created_at FROM oauth_clients WHERE id = ?', [id]);
+    return r && { id: r.id, name: r.name, redirectUris: JSON.parse(r.redirect_uris) as string[], createdAt: r.created_at };
+  }
+
+  async createCode(c: OAuthCode & { createdAt: string }) {
+    await this.db.run(
+      `INSERT INTO oauth_codes (code_hash, client_id, user_id, redirect_uri, code_challenge, resource, user_agent, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [c.codeHash, c.clientId, c.userId, c.redirectUri, c.codeChallenge, c.resource, c.userAgent, c.createdAt, c.expiresAt]);
+  }
+
+  async consumeCode(codeHash: string, now: string) {
+    const r = await this.db.first<{
+      code_hash: string; client_id: string; user_id: string; redirect_uri: string;
+      code_challenge: string; resource: string; user_agent: string | null; expires_at: string;
+    }>(
+      `UPDATE oauth_codes SET consumed_at = ?
+       WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ?
+       RETURNING code_hash, client_id, user_id, redirect_uri, code_challenge, resource, user_agent, expires_at`,
+      [now, codeHash, now]);
+    return r && {
+      codeHash: r.code_hash, clientId: r.client_id, userId: r.user_id, redirectUri: r.redirect_uri,
+      codeChallenge: r.code_challenge, resource: r.resource, userAgent: r.user_agent, expiresAt: r.expires_at,
+    };
+  }
+
+  async createConnection(c: Omit<OAuthConnection, 'clientName'>) {
+    await this.db.run(
+      'INSERT INTO oauth_connections (id, user_id, client_id, created_at, last_used_at, expires_at, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [c.id, c.userId, c.clientId, c.createdAt, c.lastUsedAt, c.expiresAt, c.userAgent]);
+  }
+
+  async getConnection(id: Id) {
+    const r = await this.db.first<ConnectionRow>(`${CONNECTION_SELECT} WHERE c.id = ?`, [id]);
+    return r && toConnection(r);
+  }
+
+  async touchConnection(id: Id, lastUsedAt: string, expiresAt: string) {
+    await this.db.run('UPDATE oauth_connections SET last_used_at = ?, expires_at = ? WHERE id = ?', [lastUsedAt, expiresAt, id]);
+  }
+
+  async listConnections(userId: Id) {
+    const rows = await this.db.all<ConnectionRow>(`${CONNECTION_SELECT} WHERE c.user_id = ? ORDER BY c.created_at DESC`, [userId]);
+    return rows.map(toConnection);
+  }
+
+  async deleteConnection(userId: Id, id: Id) {
+    // RETURNING rather than `changes`: D1 counts cascaded token rows in changes.
+    return !!(await this.db.first('DELETE FROM oauth_connections WHERE id = ? AND user_id = ? RETURNING id', [id, userId]));
+  }
+
+  async deleteAllConnections(userId: Id) { await this.db.run('DELETE FROM oauth_connections WHERE user_id = ?', [userId]); }
+
+  async addToken(t: OAuthToken) {
+    await this.db.run('INSERT INTO oauth_tokens (token_hash, connection_id, kind, expires_at, rotated_at) VALUES (?, ?, ?, ?, ?)',
+      [t.tokenHash, t.connectionId, t.kind, t.expiresAt, t.rotatedAt]);
+  }
+
+  async getToken(tokenHash: string) {
+    const r = await this.db.first<{ token_hash: string; connection_id: string; kind: 'access' | 'refresh'; expires_at: string; rotated_at: string | null }>(
+      'SELECT token_hash, connection_id, kind, expires_at, rotated_at FROM oauth_tokens WHERE token_hash = ?', [tokenHash]);
+    return r && { tokenHash: r.token_hash, connectionId: r.connection_id, kind: r.kind, expiresAt: r.expires_at, rotatedAt: r.rotated_at };
+  }
+
+  async markRotated(tokenHash: string, now: string) {
+    return (await this.db.run('UPDATE oauth_tokens SET rotated_at = ? WHERE token_hash = ? AND rotated_at IS NULL', [now, tokenHash])).changes === 1;
+  }
+
+  async deleteToken(tokenHash: string) { await this.db.run('DELETE FROM oauth_tokens WHERE token_hash = ?', [tokenHash]); }
+
+  async deleteExpired(now: string) {
+    await this.db.batch([
+      stmt('DELETE FROM oauth_codes WHERE expires_at <= ?', now),
+      stmt('DELETE FROM oauth_tokens WHERE expires_at <= ?', now),
+      stmt('DELETE FROM oauth_connections WHERE expires_at <= ?', now),
+    ]);
   }
 }

@@ -97,6 +97,40 @@ export interface AuthCodeRepo {
   consume(id: Id, now: string): Promise<boolean>;
 }
 
+// ---------- oauth (MCP connector) ----------
+
+export interface OAuthClient { id: Id; name: string; redirectUris: string[]; createdAt: string }
+export interface OAuthCode {
+  codeHash: string; clientId: Id; userId: Id; redirectUri: string;
+  codeChallenge: string; resource: string; userAgent: string | null; expiresAt: string;
+}
+export interface OAuthConnection {
+  id: Id; userId: Id; clientId: Id; clientName: string;
+  createdAt: string; lastUsedAt: string; expiresAt: string; userAgent: string | null;
+}
+export interface OAuthToken { tokenHash: string; connectionId: Id; kind: 'access' | 'refresh'; expiresAt: string; rotatedAt: string | null }
+
+export interface OAuthRepo {
+  createClient(c: OAuthClient): Promise<void>;
+  getClient(id: Id): Promise<OAuthClient | null>;
+  createCode(c: OAuthCode & { createdAt: string }): Promise<void>;
+  /** Atomically marks the code consumed; returns it only if it was unconsumed and unexpired at `now`. */
+  consumeCode(codeHash: string, now: string): Promise<OAuthCode | null>;
+  createConnection(c: Omit<OAuthConnection, 'clientName'>): Promise<void>;
+  getConnection(id: Id): Promise<OAuthConnection | null>;        // joins client name
+  touchConnection(id: Id, lastUsedAt: string, expiresAt: string): Promise<void>;
+  listConnections(userId: Id): Promise<OAuthConnection[]>;       // newest first
+  /** Deletes the connection and (cascade) its tokens. Scoped by user; false when not found. */
+  deleteConnection(userId: Id, id: Id): Promise<boolean>;
+  deleteAllConnections(userId: Id): Promise<void>;
+  addToken(t: OAuthToken): Promise<void>;
+  getToken(tokenHash: string): Promise<OAuthToken | null>;
+  /** Sets rotated_at only if it is still null; false if another request already rotated it. */
+  markRotated(tokenHash: string, now: string): Promise<boolean>;
+  deleteToken(tokenHash: string): Promise<void>;
+  deleteExpired(now: string): Promise<void>;                      // codes, tokens, connections past expires_at
+}
+
 export interface RateLimiter {
   /** Counts a hit; returns 0 when allowed, otherwise seconds until the window resets. */
   hit(key: string, limit: number, windowSeconds: number, now: Date): Promise<number>;

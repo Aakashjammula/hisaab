@@ -16,3 +16,11 @@ export class AppError extends Error {
 
 export const invalid = (message: string): never => { throw new AppError('validation', message); };
 export const notFound = (what: string): never => { throw new AppError('not_found', `${what} not found`); };
+
+/** RFC 6749 error: `error` is the code (invalid_request, invalid_client, invalid_grant, unsupported_grant_type,
+ *  invalid_redirect_uri, access_denied, invalid_token); the message is the human-readable description. */
+export class OAuthError extends Error {
+  constructor(readonly error: string, description: string, readonly status = 400) {
+    super(description);
+  }
+}
