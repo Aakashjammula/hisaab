@@ -1,6 +1,6 @@
 import { suggestIcon, COLORS } from '../../public/js/icon-list.js';
 import { daysBefore, parsePeriod, todayIn } from '../core/dates.ts';
-import { toPaise } from '../../public/js/money.js';
+import { formatINR, toPaise, toRupeeString } from '../../public/js/money.js';
 import { AppError, invalid, notFound } from '../core/errors.ts';
 import { isId, nameKey, parseCategoryInput, parseExpenseInput } from '../core/validate.ts';
 import type { Category, CategoryWithUsage, Expense, ExpenseInput, Id, Period } from '../core/types.ts';
@@ -114,6 +114,43 @@ export class ExpenseService {
     const input = parseExpenseInput(body);
     if (!(await this.d.expenses.update(userId, id, await this.toNew(userId, input)))) notFound('Expense');
     return (await this.d.expenses.get(userId, id))!;
+  }
+
+  /**
+   * Partial edit for Claude: only the fields in `patch` change. A new amount on a split expense must come
+   * with the new split (shares and/or my_share): we ask rather than guess how to divide someone's money.
+   */
+  async patch(userId: Id, rawId: string, patch: Record<string, unknown>): Promise<Expense> {
+    const current = await this.get(userId, rawId);
+    const has = (k: string) => k in patch;
+
+    const newPaid = has('paid') ? toPaise(patch.paid) : null;
+    const isSplit = current.shares.length > 0 || current.myShare < current.paid;
+    if (newPaid != null && newPaid !== current.paid && isSplit && !has('shares') && !has('my_share')) {
+      const others = current.shares.reduce((sum, s) => sum + s.amount, 0);
+      const unassigned = current.paid - current.myShare - others;
+      const parts = [`you ${formatINR(current.myShare)}`, ...current.shares.map(s => `${s.person.name} ${formatINR(s.amount)}`)];
+      if (unassigned > 0) parts.push(`unassigned ${formatINR(unassigned)}`);
+      invalid(`This expense is split (${parts.join(', ')}). Send the new shares for ${formatINR(newPaid)}.`);
+    }
+
+    const body: Record<string, unknown> = {
+      paid: has('paid') ? patch.paid : toRupeeString(current.paid),
+      spent_on: has('spent_on') ? patch.spent_on : current.spentOn,
+      note: has('note') ? patch.note : current.note,
+      category: has('category') ? patch.category : current.category.name,
+      category_icon: patch.category_icon,
+      category_color: patch.category_color,
+      shares: has('shares') ? patch.shares : current.shares.map(s => ({ person: s.person.name, amount: toRupeeString(s.amount) })),
+    };
+    // Left out, the validator works my share out: what's left after the shares, or all of it when not split.
+    if (has('my_share')) body.my_share = patch.my_share;
+    else if (isSplit && !has('shares')) body.my_share = toRupeeString(current.myShare);
+    return this.update(userId, current.id, body);
+  }
+
+  async get(userId: Id, rawId: string): Promise<Expense> {
+    return await this.d.expenses.get(userId, requireId(rawId, 'Expense')) ?? notFound('Expense');
   }
 
   async delete(userId: Id, rawId: string): Promise<void> {

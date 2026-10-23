@@ -52,6 +52,28 @@ const schema = (properties: Record<string, unknown>, required: string[] = []) =>
   ({ type: 'object', properties, ...(required.length ? { required } : {}), additionalProperties: false });
 
 const READ = { readOnlyHint: true, idempotentHint: true, openWorldHint: false } as const;
+const CREATE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } as const;
+/** Changes or removes existing data: Claude's apps ask the person before running these. */
+const CHANGE = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } as const;
+
+const EXPENSE_PROPS = {
+  paid: { ...AMOUNT, description: 'Total amount paid, in rupees' },
+  spent_on: { type: 'string', description: 'Date as YYYY-MM-DD' },
+  category: { type: 'string', description: 'Category name. A new name creates the category.' },
+  note: { type: ['string', 'null'], description: 'Short note, up to 200 characters' },
+  my_share: { ...AMOUNT, description: "The person's own part of a split bill. Leave it out when giving shares to have it worked out." },
+  shares: {
+    type: 'array', description: "Other people's parts of a split bill, by name. New names are added as people.",
+    items: schema({ person: { type: 'string' }, amount: AMOUNT }, ['person', 'amount']),
+  },
+  category_icon: { type: 'string', description: 'Icon name for a new category (see list_categories)' },
+  category_color: { type: 'string', description: 'Colour name for a new category (see list_categories)' },
+};
+const CATEGORY_PROPS = {
+  name: { type: 'string', description: 'Up to 40 characters' },
+  icon: { type: 'string', description: 'Icon name (see list_categories)' },
+  color: { type: 'string', description: 'Colour name (see list_categories)' },
+};
 
 export function buildTools(d: AppDeps): ToolDef[] {
   return [
@@ -132,6 +154,76 @@ export function buildTools(d: AppDeps): ToolDef[] {
       description: 'Everyone the person splits bills with, most used first.',
       inputSchema: schema({}), annotations: READ,
       run: async user => ({ people: (await d.people.list(user.id)).map(personJson) }),
+    },
+    {
+      name: 'add_expense', title: 'Add expense',
+      description: 'Log one expense. For a split bill give shares for the other people (my_share is then what is left), '
+        + "or just my_share. Categories and people named here are created automatically if they don't exist.",
+      inputSchema: schema(EXPENSE_PROPS, ['paid', 'spent_on', 'category']), annotations: CREATE,
+      run: async (user, a) => toolExpense(await d.expenses.create(user.id, a)),
+    },
+    {
+      name: 'update_expense', title: 'Edit expense',
+      description: 'Change an expense: send its id and only the fields to change; everything else stays. note: null clears the note, '
+        + 'shares: [] removes the split. Changing the amount of a split expense needs the new shares and/or my_share too: '
+        + 'if they are missing this fails with the current split, so ask the person how to split the new amount.',
+      inputSchema: schema({ ...ID_PROP('expense'), ...EXPENSE_PROPS }, ['id']), annotations: CHANGE,
+      run: async (user, a) => {
+        const { id: _id, ...patch } = a;
+        return toolExpense(await d.expenses.patch(user.id, id(a), patch));
+      },
+    },
+    {
+      name: 'delete_expense', title: 'Delete expense',
+      description: 'Delete one expense by id. Returns what was deleted.',
+      inputSchema: schema(ID_PROP('expense'), ['id']), annotations: CHANGE,
+      run: async (user, a) => {
+        const before = await d.expenses.get(user.id, id(a));
+        await d.expenses.delete(user.id, before.id);
+        return { ok: true, deleted: toolExpense(before) };
+      },
+    },
+    {
+      name: 'create_category', title: 'Create category',
+      description: 'Add a category. Icon and colour are picked automatically when left out.',
+      inputSchema: schema(CATEGORY_PROPS, ['name']), annotations: CREATE,
+      run: async (user, a) => categoryJson(await d.categories.create(user.id, a)),
+    },
+    {
+      name: 'update_category', title: 'Edit category',
+      description: "Rename a category or change its icon or colour. Send only what changes.",
+      inputSchema: schema({ ...ID_PROP('category'), ...CATEGORY_PROPS }, ['id']), annotations: CHANGE,
+      run: async (user, a) => {
+        const { id: _id, ...patch } = a;
+        return categoryJson(await d.categories.update(user.id, id(a), patch));
+      },
+    },
+    {
+      name: 'delete_category', title: 'Delete category',
+      description: 'Deletes one category. Its expenses move to "Other". "Other" cannot be deleted.',
+      inputSchema: schema(ID_PROP('category'), ['id']), annotations: CHANGE,
+      run: async (user, a) => ({ ok: true, moved: await d.categories.delete(user.id, id(a)) }),
+    },
+    {
+      name: 'add_person', title: 'Add person',
+      description: 'Add someone to split bills with (just a name).',
+      inputSchema: schema({ name: { type: 'string', description: 'Up to 40 characters' } }, ['name']), annotations: CREATE,
+      run: async (user, a) => personJson(await d.people.create(user.id, a)),
+    },
+    {
+      name: 'rename_person', title: 'Rename person',
+      description: 'Change the name of someone you split bills with.',
+      inputSchema: schema({ ...ID_PROP('person'), name: { type: 'string' } }, ['id', 'name']), annotations: CHANGE,
+      run: async (user, a) => personJson(await d.people.rename(user.id, id(a), { name: a.name })),
+    },
+    {
+      name: 'delete_person', title: 'Delete person',
+      description: 'Deletes one person. Their shares on past expenses become unassigned.',
+      inputSchema: schema(ID_PROP('person'), ['id']), annotations: CHANGE,
+      run: async (user, a) => {
+        await d.people.delete(user.id, id(a));
+        return { ok: true };
+      },
     },
   ];
 }
