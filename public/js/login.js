@@ -1,5 +1,6 @@
 // Two-step sign-in: email → 8-digit code. The session is an HttpOnly cookie set by the server.
 import { api } from './api.js';
+import { safeNext } from './next.js';
 import { $ } from './ui.js';
 
 const RESEND_SECONDS = 60;
@@ -80,6 +81,9 @@ export function initLogin(options) {
     try {
       const me = await api.verifyCode(email, code);
       clearInterval(resendTimer);
+      // Signed in from Claude's "connect" flow: go back to the consent page.
+      const next = safeNext(location.search, location.origin);
+      if (next) { location.assign(next); return; }
       onSignedIn(me);
     } catch (err) {
       showError(err.message);

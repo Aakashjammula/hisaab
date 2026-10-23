@@ -4,8 +4,8 @@
   "main": "src/adapters/cloudflare/worker.ts",
   "compatibility_date": "2026-08-22",
 
-  // The free *.workers.dev URL and preview URLs are NOT behind Cloudflare Access.
-  // Keep them off so the app is only reachable on your Access-protected domain.
+  // Sign-in is the app's own email code (plus OAuth for the Claude connector), served only on the
+  // custom domain below: the *.workers.dev and preview URLs stay off.
   "workers_dev": false,
   "preview_urls": false,
 
@@ -16,7 +16,7 @@
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/mcp", "/oauth/*", "/.well-known/*"]
   },
 
   "d1_databases": [

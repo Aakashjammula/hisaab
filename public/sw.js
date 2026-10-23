@@ -1,11 +1,11 @@
 // Offline-capable shell. API calls are never cached (always fresh, always authenticated).
 // Bump VERSION when the list of shell files changes.
-const VERSION = 'hisaab-v9';
+const VERSION = 'hisaab-v10';
 const SHELL = [
   '/', '/css/app.css', '/icons.svg', '/manifest.webmanifest', '/favicon.svg',
   '/vendor/oat.min.css', '/vendor/oat.min.js', '/vendor/charts.min.css', '/vendor/fonts/manrope-latin.woff2',
   '/js/app.js', '/js/api.js', '/js/ui.js', '/js/money.js', '/js/icon-list.js', '/js/icon-picker.js',
-  '/js/home.js', '/js/analytics.js', '/js/categories.js', '/js/people.js', '/js/expense-dialog.js', '/js/login.js',
+  '/js/home.js', '/js/analytics.js', '/js/categories.js', '/js/people.js', '/js/expense-dialog.js', '/js/login.js', '/js/next.js',
 ];
 
 self.addEventListener('install', e => {
@@ -22,7 +22,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
 
-  // Pages: network first, so an expired Access session redirects to login; cache only when offline.
+  // Pages: network first, so a signed-out page always comes from the server; cache only when offline.
   if (e.request.mode === 'navigate') {
     e.respondWith(fetch(e.request).catch(() => caches.match('/')));
     return;

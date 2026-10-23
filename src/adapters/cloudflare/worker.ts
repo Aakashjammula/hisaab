@@ -5,11 +5,12 @@ import { createApp } from '../../http/app.ts';
 import { AuthService } from '../../services/auth.ts';
 import { AUTH_DEFAULTS, type AppConfig, type AuthMode } from '../../services/config.ts';
 import { CategoryService, ExpenseService } from '../../services/expenses.ts';
+import { OAuthService } from '../../services/oauth.ts';
 import { PersonService } from '../../services/people.ts';
 import { SummaryService } from '../../services/summary.ts';
 import type { Mailer } from '../../ports/index.ts';
 import {
-  SqlAuthCodeRepo, SqlCategoryRepo, SqlExpenseRepo, SqlPersonRepo, SqlRateLimiter, SqlSessionRepo, SqlSummaryRepo, SqlUserRepo,
+  SqlAuthCodeRepo, SqlCategoryRepo, SqlExpenseRepo, SqlOAuthRepo, SqlPersonRepo, SqlRateLimiter, SqlSessionRepo, SqlSummaryRepo, SqlUserRepo,
 } from '../sql/repos.ts';
 import { D1Client } from './d1.ts';
 import { CloudflareMailer, ConsoleMailer, MemoryMailer } from './mailer.ts';
@@ -54,6 +55,8 @@ export function buildApp(env: WorkerEnv) {
   const db = new D1Client(env.DB);
   const clock = { now: () => new Date() };
   const ids = { next: () => uuidv7() };
+  const limiter = new SqlRateLimiter(db);
+  const users = new SqlUserRepo(db);
 
   const categoryRepo = new SqlCategoryRepo(db);
   const shared = { expenses: new SqlExpenseRepo(db), categories: categoryRepo, ids, clock, config: cfg };
@@ -63,21 +66,27 @@ export function buildApp(env: WorkerEnv) {
 
   return createApp({
     auth: new AuthService({
-      users: new SqlUserRepo(db), sessions: new SqlSessionRepo(db), codes: new SqlAuthCodeRepo(db),
-      limiter: new SqlRateLimiter(db), mailer: mailer(env, cfg), clock, ids, config: cfg,
+      users, sessions: new SqlSessionRepo(db), codes: new SqlAuthCodeRepo(db),
+      limiter, mailer: mailer(env, cfg), clock, ids, config: cfg,
     }),
     expenses,
     categories,
     people,
     summary: new SummaryService(new SqlSummaryRepo(db), expenses),
+    oauth: new OAuthService({ oauth: new SqlOAuthRepo(db), users, limiter, clock, ids, config: cfg }),
+    limiter,
     clientIp: req => req.headers.get('cf-connecting-ip') ?? 'unknown',
     log: (msg, err) => console.error(msg, err),
   });
 }
 
+/** Paths the Worker answers; everything else is a static asset (keep in sync with run_worker_first in wrangler.jsonc). */
+const isAppPath = (path: string) =>
+  path === '/mcp' || path.startsWith('/api/') || path.startsWith('/oauth/') || path.startsWith('/.well-known/');
+
 export default {
   async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
-    if (!new URL(request.url).pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (!isAppPath(new URL(request.url).pathname)) return env.ASSETS.fetch(request);
     try {
       return await buildApp(env).fetch(request, env, ctx);
     } catch (err) {

@@ -1,12 +1,16 @@
 // HTTP API on Hono. Platform-neutral: Cloudflare and (later) AWS entry points both call createApp().
 import { Hono, type Context } from 'hono';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, getCookie } from 'hono/cookie';
 import { AppError } from '../core/errors.ts';
 import type { Category, Expense, Person, User } from '../core/types.ts';
+import type { RateLimiter } from '../ports/index.ts';
 import type { AuthService } from '../services/auth.ts';
 import type { CategoryService, ExpenseService } from '../services/expenses.ts';
+import type { OAuthService } from '../services/oauth.ts';
 import type { PersonService } from '../services/people.ts';
 import type { SummaryService } from '../services/summary.ts';
+import { cookieName, isHttps, setSessionCookie } from './cookies.ts';
+import { oauthRoutes } from './oauth.ts';
 
 export interface AppDeps {
   auth: AuthService;
@@ -14,6 +18,8 @@ export interface AppDeps {
   categories: CategoryService;
   people: PersonService;
   summary: SummaryService;
+  oauth: OAuthService;
+  limiter: RateLimiter;
   /** How this platform reports the caller's IP (e.g. CF-Connecting-IP, API Gateway sourceIp). */
   clientIp(req: Request): string;
   log?(message: string, err?: unknown): void;
@@ -40,10 +46,6 @@ const expenseJson = (e: Expense) => ({
 
 // ---------- helpers ----------
 
-const isHttps = (c: Context) => new URL(c.req.url).protocol === 'https:';
-/** __Host- prefix = Secure, Path=/, no Domain: the cookie can't be set or overridden by subdomains. */
-const cookieName = (c: Context) => (isHttps(c) ? '__Host-hisaab_session' : 'hisaab_session');
-
 async function body(c: Context): Promise<Record<string, unknown>> {
   if (!(c.req.header('content-type') ?? '').includes('application/json')) throw new AppError('validation', 'Expected JSON');
   try {
@@ -55,8 +57,29 @@ async function body(c: Context): Promise<Record<string, unknown>> {
 
 const periodQuery = (c: Context) => ({ month: c.req.query('month') ?? null, year: c.req.query('year') ?? null });
 
+/** Root app: the web API under /api, the OAuth server, and the MCP endpoint. */
 export function createApp(d: AppDeps) {
-  const app = new Hono<Env>().basePath('/api');
+  const app = new Hono();
+  app.route('/api', apiRoutes(d));
+  app.route('/', oauthRoutes(d));
+
+  // Stub until the MCP endpoint lands: every request is unauthenticated, pointing Claude at the OAuth metadata.
+  app.post('/mcp', c => {
+    c.header('Cache-Control', 'no-store');
+    c.header('WWW-Authenticate', `Bearer resource_metadata="${new URL(c.req.url).origin}/.well-known/oauth-protected-resource"`);
+    return c.json({ error: 'invalid_token' }, 401);
+  });
+
+  app.onError((err, c) => {
+    d.log?.('Unhandled error', err);
+    return c.json({ error: 'Something went wrong, try again' }, 500);
+  });
+  app.notFound(c => c.json({ error: 'Not found' }, 404));
+  return app;
+}
+
+function apiRoutes(d: AppDeps) {
+  const app = new Hono<Env>();
 
   app.onError((err, c) => {
     if (err instanceof AppError) {
@@ -66,7 +89,6 @@ export function createApp(d: AppDeps) {
     d.log?.('Unhandled API error', err);
     return c.json({ error: 'Something went wrong, try again' }, 500);
   });
-  app.notFound(c => c.json({ error: 'Not found' }, 404));
 
   // Responses are per-user: never cache. Writes must come from our own pages (CSRF).
   app.use('*', async (c, next) => {
@@ -89,9 +111,7 @@ export function createApp(d: AppDeps) {
   app.post('/auth/verify', async c => {
     const b = await body(c);
     const s = await d.auth.verify(b.email, b.code, d.clientIp(c.req.raw), c.req.header('user-agent') ?? null);
-    setCookie(c, cookieName(c), s.token, {
-      httpOnly: true, secure: isHttps(c), sameSite: 'Lax', path: '/', expires: new Date(s.expiresAt),
-    });
+    setSessionCookie(c, s.token, s.expiresAt);
     return c.json({ email: s.user.email });
   });
 
@@ -106,11 +126,7 @@ export function createApp(d: AppDeps) {
   app.use('*', async (c, next) => {
     const s = await d.auth.authenticate(getCookie(c, cookieName(c)));
     if (!s) throw new AppError('unauthorized', 'Please sign in');
-    if (s.renewed) {
-      setCookie(c, cookieName(c), getCookie(c, cookieName(c))!, {
-        httpOnly: true, secure: isHttps(c), sameSite: 'Lax', path: '/', expires: new Date(s.expiresAt),
-      });
-    }
+    if (s.renewed) setSessionCookie(c, getCookie(c, cookieName(c))!, s.expiresAt);
     c.set('user', s.user);
     await next();
   });
